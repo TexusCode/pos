@@ -7,32 +7,40 @@
 
     <title>{{ $title ?? 'Page Title' }}</title>
     @vite('resources/css/app.css')
-    @filamentStyles
     @fluxAppearance
 </head>
 
 <body>
     @livewire('loading')
     {{ $slot }}
-    @filamentScripts
     @fluxScripts
     @vite('resources/js/app.js')
     <script src="https://unpkg.com/hotkeys-js/dist/hotkeys.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-                    const barcodeInput = document.getElementById('barcodeInput');
-                    const exitButton = document.getElementById('exitButton');
-                    hotkeys('ctrl+enter', { preventDefault: true }, (event) => {
-                        if (document.activeElement !== barcodeInput) {
-                            barcodeInput.focus();
-                        }
-                    });
-                    hotkeys('ctrl+z', { preventDefault: true }, (event) => {
-                        console.log('Нажата комбинация Ctrl + S! Имитируем клик по кнопке "Выход".');
-                        exitButton.click();
-                    });
-                });
+            const barcodeInput = document.getElementById('barcodeInput');
+            const exitButton = document.getElementById('exitButton');
+            const truncate = document.getElementById('truncate');
+            hotkeys('ctrl+enter', {
+                preventDefault: true
+            }, (event) => {
+                if (document.activeElement !== barcodeInput) {
+                    barcodeInput.focus();
+                }
+            });
+            hotkeys('ctrl+m', {
+                preventDefault: true
+            }, (event) => {
+                exitButton.click();
+            });
+            hotkeys('ctrl+z', {
+                preventDefault: true
+            }, (event) => {
+                truncate.click();
+            });
+        });
     </script>
+    <flux:toast position="top right" />
 </body>
 
 </html>

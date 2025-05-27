@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Product extends Model
 {
@@ -11,10 +12,13 @@ class Product extends Model
      *
      * @var array<int, string>
      */
+    use HasFactory;
+
     protected $fillable = [
         'name',
         'slug',
         'sku',
+        'quantity',
         'purchase_price',
         'selling_price',
         'supplier_id',

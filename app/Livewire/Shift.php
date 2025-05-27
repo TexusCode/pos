@@ -13,7 +13,7 @@ class Shift extends Component
     public function mount()
     {
         $shift = ModelsShift::latest()->first();
-        if ($shift->status == 'open') {
+        if ($shift && $shift->status == 'open') {
             return redirect()->route('pos');
         }
     }
