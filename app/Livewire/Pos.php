@@ -14,29 +14,57 @@ class Pos extends Component
 {
     public $products;
     public $barcode;
+    public $selecteditemdiscount = null;
     public $discounttotal;
     public $discountmodel;
-    public $discounttype = 'Проценть';
+    public $discounttype = 'Фикц';
     public $discountItemModal = false;
-    public $discountAllModal = true;
+    public $discountAllModal = false;
     public $total;
     public $subtotal;
     public $shift;
     public $selectedCart;
     public $carts;
+    public function discountitem($id)
+    {
+        $item = CartItem::find($id);
+        $this->selecteditemdiscount = $item;
+        $this->discountAllModal = true;
+    }
     public function discount_all()
     {
-        $cartDiscountAmount = 0;
+        if ($this->selecteditemdiscount) {
 
-        if ($this->discounttype == 'Фикц') {
-            $cartDiscountAmount = (float) $this->discountmodel;
-        } else {
-            $percentage = (float) $this->discountmodel; // Ensure it's a number
-            $cartDiscountAmount = ($this->subtotal * $percentage) / 100;
+            $selecteditemdiscount = CartItem::find($this->selecteditemdiscount->id);
         }
-        $cart = Cart::find($this->selectedCart->id);
-        $cart->discount = $cartDiscountAmount;
-        $cart->save();
+        if (isset($selecteditemdiscount)) {
+            $itemDiscountValue = 0;
+
+            if ($this->discounttype == 'Фикц') {
+                $selecteditemdiscount->discount = (float) $this->discountmodel;
+            } else {
+                $itemLineTotalBeforeDiscount = $selecteditemdiscount->quantity * $selecteditemdiscount->product->selling_price;
+                $percentage = (float) $this->discountmodel;
+                $itemDiscountValue = ($itemLineTotalBeforeDiscount * $percentage) / 100;
+                $selecteditemdiscount->discount = $itemDiscountValue;
+            }
+
+            $selecteditemdiscount->save();
+            $this->calc(); // Обязательно пересчитайте все суммы корзины после изменения скидки на товар
+            $this->selecteditemdiscount = null;
+        } else {
+            $cartDiscountAmount = 0;
+
+            if ($this->discounttype == 'Фикц') {
+                $cartDiscountAmount = $this->discountmodel;
+            } else {
+                $percentage = (float) $this->discountmodel; // Ensure it's a number
+                $cartDiscountAmount = ($this->subtotal * $percentage) / 100;
+            }
+            $cart = Cart::find($this->selectedCart->id);
+            $cart->discount = $cartDiscountAmount;
+            $cart->save();
+        }
         $this->discountAllModal = false;
         $this->discountmodel = null;
         $this->mount();
@@ -76,7 +104,6 @@ class Pos extends Component
     {
         $this->selectedCart = Cart::find($id);
         $this->calc();
-
     }
     public function hand()
     {
@@ -122,13 +149,13 @@ class Pos extends Component
                 $productSellingPrice = $item->product->selling_price;
                 $rawSubtotal += ($productSellingPrice * $item->quantity);
                 if (isset($item->discount) && $item->discount > 0) {
-                    $itemDiscount = ($productSellingPrice * ($item->discount / 100)) * $item->quantity;
+                    $itemDiscount = $item->discount;
                     $totalDiscountAmount += $itemDiscount; // Накапливаем общую сумму скидки
                 }
             }
         }
         if ($this->selectedCart->discount) {
-            $totalDiscountAmount = $totalDiscountAmount + $this->selectedCart->discount;
+            $totalDiscountAmount = ($totalDiscountAmount + $this->selectedCart->discount);
         }
 
         $this->subtotal = $rawSubtotal;
