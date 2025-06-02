@@ -8,7 +8,6 @@ class Order extends Model
 {
     protected $fillable = [
         'customer_id',
-        'order_number',
         'total_amount',
         'discount_amount', // Добавляем новое поле
         'status',
@@ -40,5 +39,9 @@ class Order extends Model
     public function shift()
     {
         return $this->belongsTo(Shift::class);
+    }
+    public function debt()
+    {
+        return $this->hasMany(Debt::class);
     }
 }

@@ -11,6 +11,7 @@ class Audit extends Model
         'name',
         'user_id',
         'notes',
+        'status',
     ];
 
     /**

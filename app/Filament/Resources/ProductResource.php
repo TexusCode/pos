@@ -58,17 +58,11 @@ class ProductResource extends Resource
                                     ->maxLength(255)
                                     ->required()
                                     ->helperText('Уникальный идентификатор продукта.'),
-                                Forms\Components\Select::make('status')
-                                    ->label('Статус продукта') // Русская метка
-                                    ->options([
-                                        'active' => 'Активный',
-                                        'inactive' => 'Неактивный',
-                                        'draft' => 'Черновик',
-                                    ])
+                                Forms\Components\TextInput::make('quantity')
+                                    ->label('Количество') // Русская метка
+                                    ->maxLength(255)
                                     ->required()
-                                    ->default('active')
-                                    ->native(false) // Для лучшего стиля в Filament
-                                    ->columnSpan(1), // Чтобы занимал только одну колонку в своей секции
+
                             ])->columns(2), // 2 колонки для этой секции
 
                         Forms\Components\Section::make('Ценообразование')
@@ -139,6 +133,17 @@ class ProductResource extends Resource
                                     ->preload()
                                     ->nullable()
                                     ->native(false),
+                                Forms\Components\Select::make('status')
+                                    ->label('Статус продукта') // Русская метка
+                                    ->options([
+                                        'active' => 'Активный',
+                                        'inactive' => 'Неактивный',
+                                        'draft' => 'Черновик',
+                                    ])
+                                    ->required()
+                                    ->default('active')
+                                    ->native(false) // Для лучшего стиля в Filament
+                                    ->columnSpan(1), // Чтобы занимал только одну колонку в своей секции
                             ]),
                     ])->columnSpan(['lg' => 1]), // Эта группа занимает 1/3 ширины на больших экранах
             ])->columns(3); // Разделяем всю форму на 3 колонки
@@ -157,6 +162,9 @@ class ProductResource extends Resource
                     ->label('Название продукта') // Русская метка
                     ->searchable()
                     ->sortable(),
+                Tables\Columns\TextColumn::make('quantity')
+                    ->label('Коль') // Русская метка
+                    ->searchable(),
                 Tables\Columns\TextColumn::make('sku')
                     ->label('Артикул (SKU)') // Русская метка
                     ->searchable(),

@@ -26,7 +26,10 @@ class Shift extends Model
     {
         return $this->hasMany(Order::class);
     }
-
+    public function debt()
+    {
+        return $this->hasMany(Debt::class);
+    }
     /**
      * Get the user that opened the shift.
      */

@@ -2,16 +2,17 @@
 
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\CustomerResource\Pages;
-use App\Filament\Resources\CustomerResource\RelationManagers;
-use App\Models\Customer;
 use Filament\Forms;
-use Filament\Forms\Form;
-use Filament\Resources\Resource;
 use Filament\Tables;
+use App\Models\Customer;
+use Filament\Forms\Form;
 use Filament\Tables\Table;
+use Filament\Resources\Resource;
+use Filament\Tables\Actions\ActionGroup;
 use Illuminate\Database\Eloquent\Builder;
+use App\Filament\Resources\CustomerResource\Pages;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use App\Filament\Resources\CustomerResource\RelationManagers;
 
 class CustomerResource extends Resource
 {
@@ -34,10 +35,10 @@ class CustomerResource extends Resource
                 Forms\Components\TextInput::make('phone')
                     ->tel()
                     ->label("Номер телефон")
-
                     ->required(),
-                Forms\Components\Textarea::make('address')
-                    ->columnSpanFull()
+                Forms\Components\TextInput::make('debt')
+                    ->label("Долги"),
+                Forms\Components\TextInput::make('address')
                     ->label("Адрес"),
             ]);
     }
@@ -52,6 +53,9 @@ class CustomerResource extends Resource
                 Tables\Columns\TextColumn::make('phone')
                     ->label("Номер телефон")
                     ->searchable(),
+                Tables\Columns\TextColumn::make('debt')
+                    ->suffix('c')
+                    ->label("Долги"),
                 Tables\Columns\TextColumn::make('address')
                     ->label("Адрес")
                     ->searchable(),
@@ -68,8 +72,11 @@ class CustomerResource extends Resource
                 //
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
+                ActionGroup::make([
+                    Tables\Actions\ViewAction::make()->label('Просмотр'), // Русская метка
+                    Tables\Actions\EditAction::make()->label('Редактировать'), // Русская метка
+
+                ]),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([

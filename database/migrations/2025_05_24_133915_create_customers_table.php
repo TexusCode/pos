@@ -13,6 +13,7 @@ return new class extends Migration {
         Schema::create('customers', function (Blueprint $table) {
             $table->id();
             $table->string('name'); // Имя клиента
+            $table->decimal('debt', 8, 2)->default(0); // Имя клиента
             $table->string('phone')->unique(); // Телефон клиента, уникальный
             $table->text('address')->nullable(); // Адрес клиента
             $table->timestamps();

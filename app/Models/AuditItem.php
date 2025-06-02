@@ -9,6 +9,7 @@ class AuditItem extends Model
     protected $fillable = [
         'audit_id',
         'product_id',
+        'user_id',
         'old_quantity',
         'new_quantity',
         'difference',
@@ -28,5 +29,9 @@ class AuditItem extends Model
     public function product()
     {
         return $this->belongsTo(Product::class);
+    }
+    public function user()
+    {
+        return $this->belongsTo(User::class);
     }
 }

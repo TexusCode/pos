@@ -15,12 +15,19 @@
     </div>
     <div class="col-span-2 bg-white p-2">
         <ul class="space-y-2">
-            <li class="bg-green-400 hover:bg-green-300 cursor-pointer p-2 text-lg font-bold" wire:click='loading'>
-                Закрыт смену</li>
-            <li class="bg-green-400 hover:bg-green-300 cursor-pointer p-2 text-lg font-bold">Погасить долг</li>
-            <li class="bg-green-400 hover:bg-green-300 cursor-pointer p-2 text-lg font-bold">Добавить товар</li>
-            <li class="bg-red-500 hover:bg-red-400 text-white cursor-pointer p-2 text-lg font-bold">Выйти из аккаунта
-            </li>
+            <button type="button" wire:click='closeShiftModal'
+                class="bg-green-400 hover:bg-green-300 cursor-pointer p-2 text-lg font-bold w-full">Закрыт
+                смену</button>
+            <button type="button" wire:click='payDebtModalTrue'
+                class="bg-green-400 hover:bg-green-300 cursor-pointer p-2 text-lg font-bold w-full">Погасить
+                долг</button>
+            <button type="button" wire:click='addProductModalTrue'
+                class="bg-green-400 hover:bg-green-300 cursor-pointer p-2 text-lg font-bold w-full">Добавить
+                товар</button>
+            <button type="button" wire:click='logout'
+                class="bg-red-500 hover:bg-red-400 cursor-pointer p-2 text-lg font-bold w-full">Выйти из
+                аккаунта</button>
+
         </ul>
         <div class="mt-5 space-y-1">
             <p>Список корзины</p>
@@ -64,7 +71,7 @@
     </div>
     <div class="col-span-4 bg-white p-2 space-y-2 h-screen flex flex-col">
         <div class="flex gap-3 justify-between text-black items-center">
-            <p>Смена №{{ $shift->id }} - Корзина №{{ $selectedCart->id }}</p>
+            <p>Смена №{{ $shift->id }}</p>
         </div>
         <div class="space-y-1 overflow-y-scroll h-full">
             @foreach ($selectedCart->items as $item)
@@ -137,10 +144,18 @@
                 </form>
             @endif
             <div class="flex gap-1">
-                <button class="bg-black text-white hover:bg-black/70 cursor-pointer px-3 py-1 w-full">Оформить
+                <button type="button" wire:click='openCheckoutModal'
+                    class="bg-black text-white hover:bg-black/70 cursor-pointer px-3 py-1 w-full">Оформить
                     (ctrl+c)</button>
-                <button class="bg-red-500 text-white hover:bg-red-500/70 cursor-pointer px-3 py-1 w-full">Возврать
-                    (ctrl+v)</button>
+                @if ($returnModal)
+                    <button type="button" wire:click='orderReturn'
+                        class="bg-green-500 text-white hover:bg-green-500/70 cursor-pointer px-3 py-1 w-full">Подтвердить
+                    </button>
+                @else
+                    <button type="button" wire:click='returnModalTrue'
+                        class="bg-red-500 text-white hover:bg-red-500/70 cursor-pointer px-3 py-1 w-full">Возврать
+                    </button>
+                @endif
             </div>
             <div class="flex gap-1">
                 <button type="button" wire:click='hand'
@@ -152,4 +167,124 @@
             </div>
         </div>
     </div>
+    @if ($checkoutModal)
+        <div class="fixed top-0 left-0 w-screen h-screen overflow-hidden bg-black/50 flex justify-center items-center">
+            <div class="w-xl bg-white space-y-3">
+                <div class="w-full flex justify-between items-center bg-slate-200 p-2">
+                    <h1>Оформить заказь</h1>
+                    <button type="button" wire:click='closeCheckoutModal'
+                        class="text-red-500 font-bold cursor-pointer">Закрыть</button>
+                </div>
+                <form wire:submit='checkout' class="w-full space-y-3 p-2">
+                    <label>Метод оплата</label>
+                    <select wire:model.live='paymentType' required class="border-2 w-full">
+                        <option value="Наличными">Наличными</option>
+                        <option value="Карта">Карта</option>
+                        <option value="В долг">В долг</option>
+                    </select>
+                    @if ($debtModal)
+                        <label>Имя</label>
+                        <input type="text" wire:model='name' required class="border-2 w-full">
+                        <label>Номер телефон</label>
+                        <input type="text" wire:model='phone' required class="border-2 w-full">
+                    @endif
+                    <label>Полученная сумма</label>
+                    <input type="text" wire:model.live='cash' required class="border-2 w-full">
+
+                    <div class="bg-slate-100 p-2 font-bold text-red-500">
+                        <div class="flex justify-between">
+                            <p>Подытог:</p>
+                            <p>{{ $subtotal }}c</p>
+                        </div>
+                        <div class="flex justify-between">
+                            <p>Скидка:</p>
+                            <p>{{ $discounttotal }}c</p>
+                        </div>
+                        <div class="flex justify-between">
+                            <p>Итог:</p>
+                            <p>{{ $total }}c</p>
+                        </div>
+                        <div class="flex justify-between">
+                            <p>Сдачи:</p>
+                            <p>
+                                @if ($cash == null)
+                                    {{ -$total }}c
+                                @else
+                                    {{ $cash - $total }}c
+                                @endif
+                            </p>
+                        </div>
+                    </div>
+                    <label>Заметка</label>
+                    <input type="text" wire:model='note' class="border-2 w-full">
+                    <button type="submit"
+                        class="bg-black text-white hover:bg-black/70 cursor-pointer px-3 py-1 w-full">Оформить</button>
+                </form>
+            </div>
+        </div>
+    @endif
+    @if ($debtPaymentModal)
+        <div class="fixed top-0 left-0 w-screen h-screen overflow-hidden bg-black/50 flex justify-center items-center">
+            <div class="w-xl bg-white space-y-3">
+                <div class="w-full flex justify-between items-center bg-slate-200 p-2">
+                    <h1>Погасить долг</h1>
+                    <button type="button" wire:click='closeCheckoutModal'
+                        class="text-red-500 font-bold cursor-pointer">Закрыть</button>
+                </div>
+                <form wire:submit='payDebt' class="w-full space-y-3 p-2">
+                    <label>Номер телефон</label>
+                    <input type="text" wire:model.live='phoneDebt' required class="border-2 w-full">
+                    <label>Полученная сумма</label>
+                    <input type="text" wire:model='cashDebt' required class="border-2 w-full">
+                    <button type="submit"
+                        class="bg-black text-white hover:bg-black/70 cursor-pointer px-3 py-1 w-full">Погасить</button>
+                </form>
+            </div>
+        </div>
+    @endif
+    @if ($shiftModal)
+        <div class="fixed top-0 left-0 w-screen h-screen overflow-hidden bg-black/50 flex justify-center items-center">
+            <div class="w-xl bg-white space-y-3">
+                <div class="w-full flex justify-between items-center bg-slate-200 p-2">
+                    <h1>Погасить долг</h1>
+                    <button type="button" wire:click='closeCheckoutModal'
+                        class="text-red-500 font-bold cursor-pointer">Закрыть</button>
+                </div>
+                <form wire:submit='closeShift' class="w-full space-y-3 p-2">
+                    <label>Наличными на кассе</label>
+                    <input type="text" wire:model='nallCassa' required class="border-2 w-full">
+                    <button type="submit"
+                        class="bg-black text-white hover:bg-black/70 cursor-pointer px-3 py-1 w-full">Закрыть</button>
+                </form>
+            </div>
+        </div>
+    @endif
+    @if ($addProductModal)
+        <div class="fixed top-0 left-0 w-screen h-screen overflow-hidden bg-black/50 flex justify-center items-center">
+            <div class="w-xl bg-white space-y-3">
+                <div class="w-full flex justify-between items-center bg-slate-200 p-2">
+                    <h1>Добавит товары</h1>
+                    <button type="button" wire:click='closeCheckoutModal'
+                        class="text-red-500 font-bold cursor-pointer">Закрыть</button>
+                </div>
+                <form wire:submit='addPRoductForm' class="w-full space-y-3 p-2">
+                    <label>Штрихкод товара</label>
+                    <input type="text" wire:model.live='skuPr' required class="border-2 w-full">
+                    @if ($addProductSection)
+                        <label>Названия товара</label>
+                        <input type="text" wire:model='namePr' required class="border-2 w-full">
+                        <label>Цена продажи</label>
+                        <input type="text" wire:model='selling_pricePr' required class="border-2 w-full">
+                    @endif
+                    @if ($issetPr)
+                        <label>Количество</label>
+                        <input type="text" wire:model='quantityPr' required class="border-2 w-full">
+                    @endif
+                    <button type="submit"
+                        class="bg-black text-white hover:bg-black/70 cursor-pointer px-3 py-1 w-full">Добавить \
+                        Обновить</button>
+                </form>
+            </div>
+        </div>
+    @endif
 </div>

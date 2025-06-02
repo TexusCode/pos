@@ -16,6 +16,7 @@ return new class extends Migration {
             $table->string('name')->nullable(); // Название/имя ревизии (например, "Ежемесячная ревизия May 2025")
             $table->foreignId('user_id')->nullable()->constrained('users')->onDelete('set null'); // Пользователь, который провел ревизию
             $table->text('notes')->nullable(); // Дополнительные заметки к ревизии
+            $table->text('status')->default('open'); // Дополнительные заметки к ревизии
             $table->timestamps();
         });
     }

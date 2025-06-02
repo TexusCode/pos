@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Audit;
 use App\Livewire\Login;
 use App\Livewire\Pos;
 use App\Livewire\Shift;
@@ -11,4 +12,5 @@ Route::middleware('guest')->group(function () {
 Route::middleware('auth')->group(function () {
     Route::get('/', Shift::class)->name('shift');
     Route::get('/pos', Pos::class)->name('pos');
+    Route::get('/audit', Audit::class)->name('audit');
 });

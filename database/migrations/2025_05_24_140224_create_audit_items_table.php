@@ -15,6 +15,7 @@ return new class extends Migration {
             $table->foreignId('audit_id')->constrained('audits')->onDelete('cascade'); // ID ревизии
             $table->foreignId('product_id')->constrained('products')->onDelete('cascade'); // ID продукта
             $table->integer('old_quantity'); // Старое количество продукта до ревизии
+            $table->integer('user_id'); // Старое количество продукта до ревизии
             $table->integer('new_quantity'); // Новое (фактическое) количество продукта после ревизии
             $table->integer('difference')->default(0); // Разница (new_quantity - old_quantity)
             $table->timestamps();

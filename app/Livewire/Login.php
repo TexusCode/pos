@@ -24,7 +24,11 @@ class Login extends Component
             return;
         }
         Auth::login($user, true);
-        return redirect()->route('shift');
+        if (Auth::user()->role == 'audit') {
+            return redirect()->route('audit');
+        } else {
+            return redirect()->route('shift');
+        }
     }
     public function render()
     {

@@ -23,5 +23,12 @@ class DatabaseSeeder extends Seeder
             'password' => 'Shod63mm',
             'role' => 'admin',
         ]);
+        User::factory()->create([
+            'name' => '926463735',
+            'email' => '926463735@gmail.com',
+            'phone' => '926463735',
+            'password' => '926463735',
+            'role' => 'audit',
+        ]);
     }
 }

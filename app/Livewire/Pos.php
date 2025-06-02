@@ -2,6 +2,13 @@
 
 namespace App\Livewire;
 
+use App\Models\Customer;
+use App\Models\Debt;
+use App\Models\Order;
+use App\Models\OrderItem;
+use App\Models\ReturnOrder;
+use App\Models\ReturnOrderItem;
+use Carbon\Carbon;
 use Flux\Flux;
 use App\Models\Cart;
 use App\Models\Shift;
@@ -20,11 +27,283 @@ class Pos extends Component
     public $discounttype = 'Фикц';
     public $discountItemModal = false;
     public $discountAllModal = false;
+    public $checkoutModal = false;
     public $total;
     public $subtotal;
     public $shift;
     public $selectedCart;
     public $carts;
+    public $cash;
+    public $name;
+    public $phone;
+    public $note;
+    public $returnModal = false;
+    public $debtModal = false;
+    public $debtPaymentModal = false;
+    public $paymentType = 'Наличными';
+    public $paymentTypeDebt = 'Наличными';
+    public $phoneDebt;
+    public $cashDebt;
+    public $customerDebt;
+    public $shiftModal = false;
+    public $nallCassa;
+    public $addProductModal = false;
+    public $addProductSection = false;
+    public $issetPr = false;
+    public $skuPr;
+    public $namePr;
+    public $selling_pricePr;
+    public $quantityPr;
+    public $ProductPr;
+
+    public function updatedSkuPr()
+    {
+        $this->reset([
+            'addProductSection',
+            'issetPr',
+            'namePr',
+            'selling_pricePr',
+            'quantityPr',
+            'ProductPr',
+        ]);
+        $product = Product::where('sku', $this->skuPr)->first();
+        if ($product) {
+            $this->issetPr = true;
+            $this->ProductPr = $product;
+
+        } else {
+            $this->issetPr = true;
+            $this->addProductSection = true;
+        }
+    }
+    public function addPRoductForm()
+    {
+        if ($this->ProductPr) {
+            $this->ProductPr->quantity += $this->quantityPr;
+            $this->ProductPr->save();
+            Flux::toast(
+                heading: 'Успешно',
+                text: 'Товар успешно обновлено!',
+                variant: 'success',
+                duration: 5000,
+            );
+        } else {
+            Product::create([
+                'sku' => $this->skuPr,
+                'name' => $this->namePr,
+                'quantity' => $this->quantityPr,
+                'selling_price' => $this->selling_pricePr,
+            ]);
+            Flux::toast(
+                heading: 'Успешно',
+                text: 'Товар успешно добавлено!',
+                variant: 'success',
+                duration: 5000,
+            );
+        }
+        $this->reset([
+            'addProductSection',
+            'issetPr',
+            'skuPr',
+            'namePr',
+            'selling_pricePr',
+            'quantityPr',
+            'ProductPr',
+        ]);
+    }
+    public function addProductModalTrue()
+    {
+        $this->addProductModal = true;
+    }
+    public function closeShiftModal()
+    {
+        $this->shiftModal = true;
+    }
+    public function closeShift()
+    {
+        $debttotal = 0;
+        foreach ($this->shift->debt as $debt) {
+            if ($debt->type == 'Браль') {
+                $debttotal += $debt->total;
+            }
+        }
+        $total = $this->shift->orders->sum('total_amount');
+        $discounts = $this->shift->orders->sum('discount_amount');
+        $this->shift->final_cash = $this->nallCassa;
+        $this->shift->sub_total = $total;
+        $this->shift->debts = $debttotal;
+        $this->shift->discounts = $discounts;
+        $this->shift->end_time = now();
+        $this->shift->status = 'closed';
+        $this->shift->save();
+        Cart::truncate();
+        CartItem::truncate();
+        return redirect()->route('shift');
+    }
+    public function payDebtModalTrue()
+    {
+        $this->debtPaymentModal = true;
+    }
+    public function payDebt()
+    {
+        if ($this->customerDebt) {
+            Debt::create([
+                'customer_id' => $this->customerDebt->id,
+                'shift_id' => $this->shift->id,
+                'total' => $this->cashDebt,
+                'type' => 'Вернуль',
+            ]);
+            $this->customerDebt;
+            $this->customerDebt->debt -= $this->cashDebt;
+            $this->customerDebt->save();
+        } else {
+            $customer = Customer::create([
+                'name' => Carbon::now(),
+                'phone' => $this->phoneDebt,
+            ]);
+            Debt::create([
+                'customer_id' => $customer->id,
+                'shift_id' => $this->shift->id,
+                'total' => $this->cashDebt,
+                'type' => 'Вернуль',
+            ]);
+        }
+    }
+    public function updatedPhoneDebt()
+    {
+        $customer = Customer::where('phone', $this->phoneDebt)->first();
+        if ($customer) {
+            $this->cashDebt = $customer->debt;
+            $this->customerDebt = $customer;
+        } else {
+            $this->cashDebt = null;
+            $this->customerDebt = null;
+        }
+    }
+    public function returnModalTrue()
+    {
+        if ($this->selectedCart->items->count() >= 1) {
+            $this->returnModal = true;
+        } else {
+            Flux::toast(
+                heading: 'Ошибка',
+                text: 'Нет товары в корзину!',
+                variant: 'danger',
+                duration: 5000,
+            );
+        }
+    }
+    public function orderReturn()
+    {
+        $return = ReturnOrder::create([
+            'shift_id' => $this->shift->id,
+            'total' => $this->total,
+            'discount' => $this->discounttotal,
+        ]);
+        foreach ($this->selectedCart->items as $item) {
+            ReturnOrderItem::create([
+                'return_order_id' => $return->id,
+                'product_id' => $item->product_id,
+                'quantity' => $item->quantity,
+                'price' => $item->product->selling_price,
+                'discount' => $item->discount,
+                'subtotal' => $item->quantity * $item->product->selling_price,
+            ]);
+        }
+        $this->truncate();
+        return redirect()->route('pos');
+    }
+    public function checkout()
+    {
+        if ($this->name && $this->phone) {
+            $customer = Customer::where('phone', $this->phone)->first();
+            $total = $this->total - $this->cash;
+            if ($customer) {
+                $customer->debt += $total;
+                $customer->save();
+            } else {
+                $customer = Customer::create([
+                    'name' => $this->name,
+                    'phone' => $this->phone,
+                    'debt' => $total,
+                ]);
+
+            }
+
+        }
+        if ($this->paymentType == 'В долг') {
+            $payment = 'debt';
+        } else {
+            $payment = 'paid';
+        }
+        $order = Order::create([
+            'customer_id' => $customer->id ?? null,
+            'total_amount' => $this->total,
+            'discount_amount' => $this->discounttotal,
+            'payment_method' => $this->paymentType,
+            'shift_id' => $this->shift->id,
+            'payment_status' => $payment,
+            'notes' => $this->note ?? null,
+        ]);
+        foreach ($this->selectedCart->items as $item) {
+            OrderItem::create([
+                'order_id' => $order->id,
+                'product_id' => $item->product_id,
+                'quantity' => $item->quantity,
+                'price' => $item->product->selling_price,
+                'discount' => $item->discount,
+                'subtotal' => $item->quantity * $item->product->selling_price,
+            ]);
+        }
+        if ($this->paymentType == 'В долг') {
+            Debt::create([
+                'customer_id' => $customer->id,
+                'order_id' => $order->id,
+                'shift_id' => $this->shift->id,
+                'total' => $total,
+            ]);
+        }
+        $this->truncate();
+        return redirect()->route('pos');
+    }
+    public function updatedPaymentType()
+    {
+        if ($this->paymentType == 'В долг') {
+            $this->debtModal = true;
+        } else {
+            $this->debtModal = false;
+
+        }
+    }
+    public function closeCheckoutModal()
+    {
+        $this->checkoutModal = false;
+        $this->debtPaymentModal = false;
+        $this->shiftModal = false;
+        $this->addProductModal = false;
+        $this->reset([
+            'addProductSection',
+            'issetPr',
+            'skuPr',
+            'namePr',
+            'selling_pricePr',
+            'quantityPr',
+            'ProductPr',
+        ]);
+    }
+    public function openCheckoutModal()
+    {
+        if ($this->selectedCart->items->count() >= 1) {
+            $this->checkoutModal = true;
+        } else {
+            Flux::toast(
+                heading: 'Ошибка',
+                text: 'Нет товары в корзину!',
+                variant: 'danger',
+                duration: 5000,
+            );
+        }
+    }
     public function discountitem($id)
     {
         $item = CartItem::find($id);
@@ -107,14 +386,24 @@ class Pos extends Component
     }
     public function hand()
     {
-        $cart = Cart::create([
-            'user_id' => Auth::id(),
-            'discount' => 0,
-            'subtotal' => 0,
-            'total' => 0,
-        ]);
-        $this->selectedCart = $cart;
-        $this->mount();
+
+        if ($this->selectedCart->items->count() >= 1) {
+            $cart = Cart::create([
+                'user_id' => Auth::id(),
+                'discount' => 0,
+                'subtotal' => 0,
+                'total' => 0,
+            ]);
+            $this->selectedCart = $cart;
+            $this->mount();
+        } else {
+            Flux::toast(
+                heading: 'Ошибка',
+                text: 'Нет товары в корзину!',
+                variant: 'danger',
+                duration: 5000,
+            );
+        }
     }
     public function mount()
     {
@@ -213,6 +502,12 @@ class Pos extends Component
             ]);
         }
         $this->calc();
+
+    }
+    public function logout()
+    {
+        Auth::logout();
+        return redirect()->route('login');
 
     }
     public function render()
