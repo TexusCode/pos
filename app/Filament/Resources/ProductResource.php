@@ -157,7 +157,7 @@ class ProductResource extends Resource
                     ->label('Фото') // Русская метка
                     ->square() // Квадратная форма для фото
                     ->defaultImageUrl(url('/images/no-image.jpg')) // Путь к изображению по умолчанию, если фото нет
-                    ->toggleable(isToggledHiddenByDefault: false), // Показываем по умолчанию
+                    ->toggleable(isToggledHiddenByDefault: true), // Показываем по умолчанию
                 Tables\Columns\TextColumn::make('name')
                     ->label('Название продукта') // Русская метка
                     ->searchable()
