@@ -20,6 +20,8 @@ class Shift extends Component
     public function logout()
     {
         Auth::logout();
+        return redirect()->route('pos');
+
     }
     public function openShiftModal()
     {
