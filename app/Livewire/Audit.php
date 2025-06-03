@@ -107,27 +107,58 @@ class Audit extends Component
     public function closeAudit()
     {
         DB::transaction(function () {
+            // 1. Обработка продуктов, которые не были учтены в аудите
             $allProducts = Product::all();
 
             foreach ($allProducts as $product) {
                 $auditItem = AuditItem::where('audit_id', $this->selectedAudit->id)
                     ->where('product_id', $product->id)
                     ->first();
+
+                // Если продукт не был найден в текущем аудите
                 if (!$auditItem) {
                     AuditItem::create([
                         'audit_id' => $this->selectedAudit->id,
                         'product_id' => $product->id,
-                        'user_id' => Auth::id(), // Записываем ID пользователя, который закрывает аудит
-                        'old_quantity' => $product->quantity, // Текущее количество товара до аудита
-                        'new_quantity' => 0, // Новое количество после аудита (если не учтен, значит 0)
-                        'difference' => 0 - $product->quantity, // Разница (0 - старое количество)
+                        'user_id' => Auth::id(),
+                        'old_quantity' => $product->quantity,
+                        'new_quantity' => 0,
+                        'difference' => 0 - $product->quantity, // Разница (старое количество - 0) будет отрицательной
                     ]);
                 }
             }
 
-            $this->selectedAudit->status = 'closed';
-            $this->selectedAudit->save();
+            // 2. Рассчитываем общие показатели недостачи
+            // Убедитесь, что 'auditItems' загружены.
+            // Если вы не перенаправляете сразу после этой функции,
+            // и auditItems могут быть не загружены в $this->selectedAudit,
+            // лучше загрузить их явно для расчета.
+            $this->selectedAudit->load('auditItems');
 
+            $negativeAuditItems = $this->selectedAudit->auditItems->where('difference', '<', 0);
+
+            // Общее количество позиций с недостачей
+            $this->selectedAudit->total_negative_items_count = $negativeAuditItems->count();
+
+            // Общая сумма недостачи (берем абсолютное значение)
+            // Важно: если difference - это количество штук, то decimal(8,2) для суммы может быть не лучшим выбором,
+            // возможно, int или float подойдет лучше, или пересчитайте difference в деньги.
+            // Сейчас он суммирует количество штук.
+            $this->selectedAudit->total_negative_difference_sum = abs($negativeAuditItems->sum('difference'));
+
+            $totalNegativeValue = 0;
+            foreach ($negativeAuditItems as $item) {
+                // Убедитесь, что $item->product существует и у него есть поле 'price'
+                if ($item->product && isset($item->product->selling_price)) {
+                    $totalNegativeValue += abs($item->difference) * $item->product->selling_price;
+                }
+            }
+            $this->selectedAudit->total_negative_value_sum = $totalNegativeValue;
+            // 3. Обновляем статус аудита и сохраняем все вычисленные поля
+            $this->selectedAudit->status = 'closed';
+            $this->selectedAudit->save(); // Сохраняем все изменения в модели Audit (включая новые поля)
+
+            // 4. Обновляем реальное количество товаров на складе после аудита
             foreach ($this->selectedAudit->auditItems as $auditItem) {
                 $product = Product::find($auditItem->product_id);
                 if ($product) {
@@ -135,7 +166,10 @@ class Audit extends Component
                     $product->save();
                 }
             }
-        });
+
+        }); // Конец транзакции
+        Auth::logout();
+        return redirect()->route('login');
     }
 
     public function render()

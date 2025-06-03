@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Models\Buy;
 use App\Models\Customer;
 use App\Models\Debt;
 use App\Models\Order;
@@ -81,6 +82,10 @@ class Pos extends Component
         if ($this->ProductPr) {
             $this->ProductPr->quantity += $this->quantityPr;
             $this->ProductPr->save();
+            Buy::create([
+                'product_id' => $this->ProductPr->id,
+                'quantity' => $this->quantityPr,
+            ]);
             Flux::toast(
                 heading: 'Успешно',
                 text: 'Товар успешно обновлено!',
@@ -88,11 +93,15 @@ class Pos extends Component
                 duration: 5000,
             );
         } else {
-            Product::create([
+            $product = Product::create([
                 'sku' => $this->skuPr,
                 'name' => $this->namePr,
                 'quantity' => $this->quantityPr,
                 'selling_price' => $this->selling_pricePr,
+            ]);
+            Buy::create([
+                'product_id' => $product->id,
+                'quantity' => $this->quantityPr,
             ]);
             Flux::toast(
                 heading: 'Успешно',

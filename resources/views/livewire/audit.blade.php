@@ -57,8 +57,14 @@
     <div class="fixed bottom-0 left-0 w-full flex justify-center items-center p-4 gap-2">
         <button type="button" wire:click='logout' class="bg-red-500 p-2 hover:bg-red-400 text-xl text-white">Выйти из
             аккаунта</button>
-        <button type="button" wire:click='closeAudit'
-            class="bg-red-500 p-2 hover:bg-red-400 text-xl text-white">Закончить
-            ревизию</button>
+        @if ($auditModal)
+            <button type="button" wire:click='closeAudit'
+                wire:confirm.prompt="Точно хотите закончивать ревизию? Для подтверждения напишите Закончить |Закончить"
+                class="bg-red-500 p-2 hover:bg-red-400 text-xl text-white">Закончить
+                ревизию</button>
+        @else
+            <a href="{{ route('audit') }}" class="bg-red-500 p-2 hover:bg-red-400 text-xl text-white">
+                Назад</a>
+        @endif
     </div>
 </div>

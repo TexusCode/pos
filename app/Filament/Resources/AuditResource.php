@@ -40,13 +40,13 @@ class AuditResource extends Resource
             ->schema([
                 Section::make('Основная информация о ревизии')
                     ->description('Общие данные по проведенной инвентаризации.')
-                    ->columns(['default' => 1, 'md' => 2, 'lg' => 3]) // Более гибкая респонсивность
+                    ->columns(['default' => 2, 'md' => 2, 'lg' => 3]) // Более гибкая респонсивность
                     ->schema([
                         TextEntry::make('name')
                             ->label('Название ревизии')
                             ->icon('heroicon-o-document-text')
                             ->weight('bold')
-                            ->size(TextEntry\TextEntrySize::Large),
+                            ->size(TextEntry\TextEntrySize::Large)->columnSpanFull(),
 
                         TextEntry::make('audit_date')
                             ->label('Дата проведения')
@@ -83,33 +83,26 @@ class AuditResource extends Resource
                         // --- Новые поля для общих минусов ---
                         TextEntry::make('total_negative_items_count')
                             ->label('Позиций с недостачей')
-                            ->formatStateUsing(function ($record) {
-                                return $record->auditItems->where('difference', '<', 0)->count();
-                            })
                             ->numeric(0, ',', ' ')
                             ->suffix(' шт.')
                             ->color('danger')
                             ->weight('bold')
-                            ->icon('heroicon-o-exclamation-triangle'), // Предупреждающая иконка
+                            ->icon('heroicon-o-exclamation-triangle'),
 
                         TextEntry::make('total_negative_difference_sum')
                             ->label('Общая недостача')
-                            ->formatStateUsing(function ($record) {
-                                // Суммируем только отрицательные значения difference
-                                // Абсолютное значение, чтобы показать 'недостача 100 сом', а не '-100 сом'
-                                return abs($record->auditItems->where('difference', '<', 0)->sum('difference'));
-                            })
                             ->numeric(0, ',', ' ') // Количество штук, а не сумма денег, поэтому 0 знаков после запятой
-                            ->suffix(' шт.') // Суффикс "шт." если разница в штуках, или "сом", если это стоимость
+                            ->suffix(' шт.')
                             ->color('danger')
                             ->weight('bold')
                             ->icon('heroicon-o-arrow-trending-down'),
-                        TextEntry::make('notes')
-                            ->label('Примечания')
-                            ->columnSpanFull() // Занимает всю ширину колонки
-                            ->markdown() // Если заметки могут быть в Markdown
-                            ->placeholder('Нет примечаний')
-                            ->color('secondary'),
+                        TextEntry::make('total_negative_value_sum')
+                            ->label('Общая сумма недостачи')
+                            ->numeric(2, ',', ' ') // Количество штук, а не сумма денег, поэтому 0 знаков после запятой
+                            ->suffix('c')
+                            ->color('danger')
+                            ->weight('bold')
+                            ->icon('heroicon-o-arrow-trending-down'),
                     ]),
 
                 Section::make('Детали подсчета товаров')
@@ -121,22 +114,23 @@ class AuditResource extends Resource
                             ->contained(false) // Убираем рамку вокруг каждого повторяющегося элемента
                             ->schema([
                                 Fieldset::make('') // Пустой Fieldset для рамки вокруг каждого элемента аудита
-                                    ->columns(['default' => 1, 'sm' => 2, 'md' => 4, 'lg' => 5]) // Респонсивная сетка для полей AuditItem
+                                    ->columns(['default' => 3, 'sm' => 2, 'md' => 4, 'lg' => 5]) // Респонсивная сетка для полей AuditItem
                                     ->schema([
                                         TextEntry::make('product.name') // Название продукта из отношения
-                                            ->label('Название товара')
+                                            ->label('Названия')
+                                            ->columnSpan(['default' => 2, 'sm' => 1])
                                             ->lineClamp(1)
                                             ->icon('heroicon-o-cube')
                                             ->weight('semibold'),
 
                                         TextEntry::make('old_quantity')
-                                            ->label('Было (Нач. кол-во)')
+                                            ->label('Было')
                                             ->numeric(0, ',', ' ') // Количество без десятичных знаков
                                             ->suffix(' шт.')
                                             ->color('gray'),
 
                                         TextEntry::make('new_quantity')
-                                            ->label('Стало (Новое кол-во)')
+                                            ->label('Стало')
                                             ->numeric(0, ',', ' ')
                                             ->suffix(' шт.')
                                             ->color('primary')

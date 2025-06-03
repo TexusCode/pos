@@ -38,14 +38,8 @@ class OrderResource extends Resource
         return $infolist
             ->schema([
                 Section::make('Общая информация о заказе') // Явный заголовок
-                    ->columns(['default' => 1, 'sm' => 2, 'lg' => 3]) // Респонсивность
+                    ->columns(['default' => 2, 'sm' => 2, 'lg' => 3]) // Респонсивность
                     ->schema([
-                        TextEntry::make('id')
-                            ->label('Номер заказа')
-                            ->badge() // Номер заказа как бейдж
-                            ->color('primary')
-                            ->icon('heroicon-o-tag'), // Иконка для номера заказа
-
                         TextEntry::make('total_amount')
                             ->label('Итог')
                             ->numeric(2, ',', ' ') // Форматирование числа: 2 знака, запятая для десятичных, пробел для тысяч
@@ -95,10 +89,11 @@ class OrderResource extends Resource
                         RepeatableEntry::make('orderItems')
                             ->label('Товары')
                             ->schema([
-                                Grid::make(['default' => 1, 'sm' => 2, 'md' => 5]) // Адаптивная сетка для полей товара
+                                Grid::make(['default' => 3, 'sm' => 2, 'md' => 5]) // Адаптивная сетка для полей товара
                                     ->schema([
                                         TextEntry::make('product.name')
                                             ->label('Название')
+                                            ->columnSpan(['default' => 2, 'sm' => 1])
                                             ->lineClamp(1)
                                             ->icon('heroicon-o-cube'), // Иконка для товара
 
@@ -123,6 +118,7 @@ class OrderResource extends Resource
                                             ->suffix('с') // Исправлено на 'с'
                                             ->weight('semibold'),
                                     ]),
+
                             ])
                             ->columns(1) // Важно, чтобы сам RepeatableEntry занимал одну колонку, а Grid внутри управлял расположением
                             ->contained(false), // Убираем внешнюю рамку для RepeatableEntry для более гладкого вида

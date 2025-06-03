@@ -21,7 +21,7 @@ class UnitResource extends Resource
     protected static ?string $navigationGroup = 'Управление продуктами'; // Группа
     protected static ?int $navigationSort = 3; // Порядок сортировки
 
-    protected static ?string $pluralModelLabel = 'Единицы измерения';
+    protected static ?string $pluralModelLabel = 'Единицы';
     protected static ?string $modelLabel = 'Единица измерения';
     protected static ?string $recordTitleAttribute = 'name';
     public static function form(Form $form): Form

@@ -12,6 +12,9 @@ class Audit extends Model
         'user_id',
         'notes',
         'status',
+        'total_negative_items_count',
+        'total_negative_difference_sum',
+        'total_negative_value_sum',
     ];
 
     /**

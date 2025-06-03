@@ -14,7 +14,7 @@ return new class extends Migration {
             $table->id();
             $table->string('name');
             $table->string('slug')->nullable();
-            $table->string('sku')->unique()->nullable();
+            $table->string('sku')->nullable();
             $table->string('quantity')->default('1');
             $table->decimal('purchase_price', 8, 2)->nullable();
             $table->decimal('selling_price', 8, 2);

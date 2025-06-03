@@ -37,12 +37,8 @@ class ShiftResource extends Resource
         return $infolist
             ->schema([
                 Section::make('Общая информация о смене') // Заголовок секции
-                    ->columns(['default' => 1, 'sm' => 2, 'lg' => 3]) // Улучшенная респонсивность
+                    ->columns(['default' => 2, 'sm' => 2, 'md' => 4]) // Улучшенная респонсивность
                     ->schema([
-                        TextEntry::make('id')
-                            ->label('№')
-                            ->badge(), // Можно сделать ID бейджем для выделения
-
                         TextEntry::make('user.name')
                             ->label('Кассир')
                             ->icon('heroicon-o-user'), // Добавим иконку для визуала
@@ -96,10 +92,10 @@ class ShiftResource extends Resource
                             ->label('')
                             ->schema([
                                 // Используем Grid для контроля колонок внутри каждого заказа
-                                Grid::make(['default' => 1, 'sm' => 2, 'md' => 4]) // Респонсивный Grid для полей заказа
+                                Grid::make(['default' => 2, 'sm' => 2, 'md' => 4]) // Респонсивный Grid для полей заказа
                                     ->schema([
                                         TextEntry::make('id')
-                                            ->label('Номер заказа')
+                                            ->label('#')
                                             ->badge(), // Номер заказа также может быть бейджем
 
                                         TextEntry::make('discount_amount')
@@ -124,12 +120,13 @@ class ShiftResource extends Resource
                                 Fieldset::make('Товары в заказе') // Используем Fieldset для визуального разделения
                                     ->schema([
                                         RepeatableEntry::make('orderItems')
-                                            ->label('Товары')
+                                            ->label('')
                                             ->schema([
-                                                Grid::make()->columns(5) // 5 колонок для товаров
+                                                Grid::make()->columns(['default' => 3, 'sm' => 3, 'md' => 4]) // 5 колонок для товаров
                                                     ->schema([
                                                         TextEntry::make('product.name')
                                                             ->label('Название')
+                                                            ->columnSpan(['default' => 2, 'sm' => 1])
                                                             ->lineClamp(1), // Ограничение на одну строку
 
                                                         TextEntry::make('price')

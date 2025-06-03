@@ -16,11 +16,13 @@ return new class extends Migration {
             $table->string('name')->nullable(); // Название/имя ревизии (например, "Ежемесячная ревизия May 2025")
             $table->foreignId('user_id')->nullable()->constrained('users')->onDelete('set null'); // Пользователь, который провел ревизию
             $table->text('notes')->nullable(); // Дополнительные заметки к ревизии
+            $table->integer('total_negative_items_count')->nullable();
+            $table->decimal('total_negative_difference_sum', 8, 2)->nullable();
+            $table->decimal('total_negative_value_sum', 10, 2)->nullable()->comment('Общая денежная сумма недостачи');
             $table->text('status')->default('open'); // Дополнительные заметки к ревизии
             $table->timestamps();
         });
     }
-
     /**
      * Reverse the migrations.
      */
