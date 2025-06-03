@@ -12,7 +12,7 @@ return [
     | other UI elements where an application name needs to be displayed.
     |
     */
-
+    'asset_url' => env('ASSET_URL', '/public'),
     'name' => env('APP_NAME', 'Laravel'),
 
     /*
