@@ -22,6 +22,7 @@ class Audit extends Component
     public $namePr;
     public $pricePr;
     public $product;
+    public $mergente = null;
     public $auditModal = true;
     public function skuCheck()
     {
@@ -29,13 +30,7 @@ class Audit extends Component
         if ($product) {
             $audit = AuditItem::where('product_id', $product->id)->where('audit_id', $this->selectedAudit->id)->first();
             if ($audit) {
-                Flux::toast(
-                    heading: 'Ошибка',
-                    text: 'Товар уже есть в списке продолжайте!',
-                    variant: 'danger',
-                    duration: 5000,
-                );
-                return;
+                $this->mergente = '1';
             }
             $this->auditModal = false;
             $this->product = $product;
@@ -55,6 +50,13 @@ class Audit extends Component
                 'new_quantity' => $this->quantityPr,
                 'difference' => $this->quantityPr - $this->product->quantity,
             ]);
+            if ($this->mergente == '1') {
+                $this->product->quantity += $this->quantityPr;
+                $this->product->save();
+            } else {
+                $this->product->quantity = $this->quantityPr;
+                $this->product->save();
+            }
         } else {
             $product = Product::create([
                 'sku' => $this->skuPr,
