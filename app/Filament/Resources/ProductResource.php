@@ -227,6 +227,9 @@ class ProductResource extends Resource
                         'inactive' => 'Неактивный',
                         'draft' => 'Черновик',
                     ]),
+                Tables\Filters\Filter::make('low_stock')
+                    ->label('Товары с низким остатком (< 10 шт.)') // Русская метка для нового фильтра
+                    ->query(fn(Builder $query): Builder => $query->where('quantity', '<', 10)),
             ])
             ->actions([
                 ActionGroup::make([
