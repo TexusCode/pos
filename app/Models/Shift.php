@@ -13,6 +13,7 @@ class Shift extends Model
         'initial_cash',
         'final_cash',
         'sub_total',
+        'total',
         'user_id',
         'status',
         'discounts',
@@ -25,6 +26,10 @@ class Shift extends Model
     public function orders()
     {
         return $this->hasMany(Order::class);
+    }
+    public function expences()
+    {
+        return $this->hasMany(Expence::class);
     }
     public function debt()
     {

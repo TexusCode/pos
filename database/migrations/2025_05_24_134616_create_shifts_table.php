@@ -16,6 +16,8 @@ return new class extends Migration {
             $table->dateTime('end_time')->nullable();
             $table->decimal('initial_cash', 10, 2)->default(0.00);
             $table->decimal('sub_total', 10, 2)->nullable();
+            $table->decimal('total', 10, 2)->nullable();
+            $table->decimal('expence', 10, 2)->nullable();
             $table->decimal('discounts', 10, 2)->nullable();
             $table->decimal('debts', 10, 2)->nullable();
             $table->decimal('final_cash', 10, 2)->nullable();

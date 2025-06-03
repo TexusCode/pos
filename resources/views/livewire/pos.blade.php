@@ -24,6 +24,9 @@
             <button type="button" wire:click='addProductModalTrue'
                 class="bg-green-400 hover:bg-green-300 cursor-pointer p-2 text-lg font-bold w-full">Добавить
                 товар</button>
+            <button type="button" wire:click='addExpenceModal'
+                class="bg-green-400 hover:bg-green-300 cursor-pointer p-2 text-lg font-bold w-full">Добавить
+                расходы</button>
             <button type="button" wire:click='logout'
                 class="bg-red-500 hover:bg-red-400 cursor-pointer p-2 text-lg font-bold w-full">Выйти из
                 аккаунта</button>
@@ -283,6 +286,25 @@
                     <button type="submit"
                         class="bg-black text-white hover:bg-black/70 cursor-pointer px-3 py-1 w-full">Добавить \
                         Обновить</button>
+                </form>
+            </div>
+        </div>
+    @endif
+    @if ($expenceModal)
+        <div class="fixed top-0 left-0 w-screen h-screen overflow-hidden bg-black/50 flex justify-center items-center">
+            <div class="w-xl bg-white space-y-3">
+                <div class="w-full flex justify-between items-center bg-slate-200 p-2">
+                    <h1>Добавит расход</h1>
+                    <button type="button" wire:click='closeCheckoutModal'
+                        class="text-red-500 font-bold cursor-pointer">Закрыть</button>
+                </div>
+                <form wire:submit='addExpence' class="w-full space-y-3 p-2">
+                    <label>Цумма</label>
+                    <input type="text" wire:model='expenceModel' required class="border-2 w-full">
+                    <label>Описание</label>
+                    <input type="text" wire:model='expenceDescModel' required class="border-2 w-full">
+                    <button type="submit"
+                        class="bg-black text-white hover:bg-black/70 cursor-pointer px-3 py-1 w-full">Добавить</button>
                 </form>
             </div>
         </div>

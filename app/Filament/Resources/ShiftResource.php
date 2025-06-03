@@ -26,7 +26,6 @@ class ShiftResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
     protected static ?string $navigationGroup = 'Операции'; // Группа
-    protected static ?int $navigationSort = 0; // Порядок сортировки
 
     protected static ?string $pluralModelLabel = 'Смены';
     protected static ?string $modelLabel = 'Смена';
@@ -37,11 +36,9 @@ class ShiftResource extends Resource
         return $infolist
             ->schema([
                 Section::make('Общая информация о смене') // Заголовок секции
-                    ->columns(['default' => 2, 'sm' => 2, 'md' => 4]) // Улучшенная респонсивность
+                    ->columns(['default' => 2, 'sm' => 2, 'md' => 5]) // Улучшенная респонсивность
                     ->schema([
-                        TextEntry::make('user.name')
-                            ->label('Кассир')
-                            ->icon('heroicon-o-user'), // Добавим иконку для визуала
+
 
                         TextEntry::make('start_time')
                             ->label('Начало смены')
@@ -52,7 +49,9 @@ class ShiftResource extends Resource
                             ->label('Окончание смены')
                             ->dateTime('d.m.Y H:i') // Форматируем дату и время
                             ->icon('heroicon-o-clock'),
-
+                        TextEntry::make('user.name')
+                            ->label('Кассир')
+                            ->icon('heroicon-o-user'), // Добавим иконку для визуала
                         // Денежные поля с суффиксом и числовым форматированием
                         TextEntry::make('sub_total')
                             ->label('Подытог')
@@ -71,7 +70,16 @@ class ShiftResource extends Resource
                             ->numeric(2, ',', ' ')
                             ->suffix('c')
                             ->color('warning'), // Долги могут быть предупреждением
-
+                        TextEntry::make('expence')
+                            ->label('Расходы')
+                            ->numeric(2, ',', ' ')
+                            ->suffix('c')
+                            ->color('warning'), // Долги могут быть предупреждением
+                        TextEntry::make('total')
+                            ->label('Итог')
+                            ->numeric(2, ',', ' ') // Форматирование числа: 2 знака, запятая для десятичных, пробел для тысяч
+                            ->suffix('c')
+                            ->color('primary'), // Выделим цветом
                         TextEntry::make('initial_cash')
                             ->label('Нач. касса')
                             ->numeric(2, ',', ' ')

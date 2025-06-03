@@ -8,6 +8,7 @@ class Order extends Model
 {
     protected $fillable = [
         'customer_id',
+        'sub_total_amount',
         'total_amount',
         'discount_amount', // Добавляем новое поле
         'status',

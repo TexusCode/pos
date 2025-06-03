@@ -14,6 +14,7 @@ return new class extends Migration {
             $table->id();
             $table->foreignId('customer_id')->nullable();
             $table->decimal('total_amount', 10, 2);
+            $table->decimal('sub_total_amount', 10, 2)->nullable();
             $table->enum('status', ['pending', 'processing', 'completed', 'cancelled'])->default('completed');
             $table->string('payment_method')->nullable();
             $table->text('notes')->nullable();

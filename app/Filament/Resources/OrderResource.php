@@ -38,8 +38,26 @@ class OrderResource extends Resource
         return $infolist
             ->schema([
                 Section::make('Общая информация о заказе') // Явный заголовок
-                    ->columns(['default' => 2, 'sm' => 2, 'lg' => 3]) // Респонсивность
+                    ->columns(['default' => 2, 'sm' => 2, 'lg' => 4]) // Респонсивность
                     ->schema([
+                        TextEntry::make('id')
+                            ->label('№')
+                            ->color('success') // Итоговая сумма зеленым
+                            ->weight('bold'),
+                        TextEntry::make('sub_total_amount')
+                            ->label('Подытог')
+                            ->numeric(2, ',', ' ') // Форматирование числа: 2 знака, запятая для десятичных, пробел для тысяч
+                            ->suffix('с')
+                            ->color('success') // Итоговая сумма зеленым
+                            ->weight('bold') // Выделим жирным
+                            ->icon('heroicon-o-banknotes'), // Иконка для суммы
+                        TextEntry::make('discount_amount')
+                            ->label('Скидка')
+                            ->numeric(2, ',', ' ')
+                            ->suffix('с')
+                            ->color('danger') // Скидка красным
+                            ->icon('heroicon-o-currency-dollar'), // Иконка для скидки
+
                         TextEntry::make('total_amount')
                             ->label('Итог')
                             ->numeric(2, ',', ' ') // Форматирование числа: 2 знака, запятая для десятичных, пробел для тысяч
@@ -48,12 +66,6 @@ class OrderResource extends Resource
                             ->weight('bold') // Выделим жирным
                             ->icon('heroicon-o-banknotes'), // Иконка для суммы
 
-                        TextEntry::make('discount_amount')
-                            ->label('Скидка')
-                            ->numeric(2, ',', ' ')
-                            ->suffix('с')
-                            ->color('danger') // Скидка красным
-                            ->icon('heroicon-o-currency-dollar'), // Иконка для скидки
 
                         TextEntry::make('payment_method')
                             ->label('Метод оплаты')

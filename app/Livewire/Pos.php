@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Models\Buy;
 use App\Models\Customer;
 use App\Models\Debt;
+use App\Models\Expence;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\ReturnOrder;
@@ -56,7 +57,27 @@ class Pos extends Component
     public $selling_pricePr;
     public $quantityPr;
     public $ProductPr;
+    public $expenceModal = false;
+    public $expenceModel;
+    public $expenceDescModel;
 
+    public function addExpenceModal()
+    {
+        $this->expenceModal = true;
+    }
+    public function addExpence()
+    {
+        Expence::create([
+            'shift_id' => $this->shift->id,
+            'total' => $this->expenceModel,
+            'description' => $this->expenceDescModel,
+        ]);
+        $this->expenceModal = false;
+        $this->reset([
+            'expenceModel',
+            'expenceDescModel',
+        ]);
+    }
     public function updatedSkuPr()
     {
         $this->reset([
@@ -136,10 +157,14 @@ class Pos extends Component
                 $debttotal += $debt->total;
             }
         }
+        $subtotal = $this->shift->orders->sum('sub_total_amount');
         $total = $this->shift->orders->sum('total_amount');
         $discounts = $this->shift->orders->sum('discount_amount');
+        $expence = $this->shift->expences->sum('total');
         $this->shift->final_cash = $this->nallCassa;
-        $this->shift->sub_total = $total;
+        $this->shift->sub_total = $subtotal;
+        $this->shift->total = $total - $expence;
+        $this->shift->expence = $expence;
         $this->shift->debts = $debttotal;
         $this->shift->discounts = $discounts;
         $this->shift->end_time = now();
@@ -248,6 +273,7 @@ class Pos extends Component
         $order = Order::create([
             'customer_id' => $customer->id ?? null,
             'total_amount' => $this->total,
+            'sub_total_amount' => $this->subtotal,
             'discount_amount' => $this->discounttotal,
             'payment_method' => $this->paymentType,
             'shift_id' => $this->shift->id,
@@ -290,6 +316,7 @@ class Pos extends Component
         $this->debtPaymentModal = false;
         $this->shiftModal = false;
         $this->addProductModal = false;
+        $this->expenceModal = false;
         $this->reset([
             'addProductSection',
             'issetPr',
@@ -298,6 +325,8 @@ class Pos extends Component
             'selling_pricePr',
             'quantityPr',
             'ProductPr',
+            'expenceModel',
+            'expenceDescModel',
         ]);
     }
     public function openCheckoutModal()
