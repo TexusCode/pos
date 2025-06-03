@@ -164,7 +164,9 @@ class ProductResource extends Resource
                     ->sortable(),
                 Tables\Columns\TextColumn::make('quantity')
                     ->label('Коль') // Русская метка
-                    ->searchable(),
+                    ->searchable()
+                    ->sortable(),
+
                 Tables\Columns\TextColumn::make('sku')
                     ->label('Артикул (SKU)') // Русская метка
                     ->searchable(),
