@@ -214,9 +214,7 @@ class OrderResource extends Resource
                 ]),
             ])
             ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
-                ]),
+
             ])
             ->defaultSort('created_at', 'desc');
 

@@ -1,4 +1,22 @@
 <div class="flex justify-center items-center h-screen w-screen bg-slate-200">
+    <style>
+.input{
+    background: #e5e7eb;          /* светло-серый фон */
+    color: #000000;               /* чёрный текст */
+    border: 1px solid #000000;    /* чёрная рамка */
+    padding: 10px 12px;           /* внутренние отступы */
+    border-radius: 8px;           /* скругление углов */
+    font-size: 16px;
+    line-height: 1.2;
+    outline: none;                /* убирает стандартный outline */
+    transition: box-shadow 0.15s ease, border-width 0.12s ease;
+    box-sizing: border-box;
+}
+.label {
+  color: #000; /* чёрный текст */
+}
+  
+    </style>
     <div class="hidden" wire:loading.class.remove='hidden'
         wire:loading.class="fixed top-0 left-0 w-screen h-screen bg-black/50 flex justify-center items-center z-50 transition-opacity duration-300">
         <div class="flex justify-center flex-col items-center bg-white p-6 rounded-xl">
@@ -16,10 +34,10 @@
     <div class="max-w-sm bg-white p-4">
         @if ($audit)
             <form wire:submit='addAudit' class="w-full space-y-3 p-2">
-                <label>Названия ревизии</label>
-                <input type="text" wire:model='auditName' required class="border-2 w-full">
-                <label>Заметка</label>
-                <input type="text" wire:model='auditNote' class="border-2 w-full">
+                <label class="label">Названия ревизии</label>
+                <input type="text" wire:model='auditName' required class="border-2 w-full input">
+                <label class="label">Заметка</label>
+                <input type="text" wire:model='auditNote' class="border-2 w-full input">
                 <button type="submit"
                     class="bg-black text-white hover:bg-black/70 cursor-pointer px-3 py-1 w-full">Создать
                     ревизия</button>
@@ -29,23 +47,23 @@
                 {{ $selectedAudit->name }}
                 @if ($auditModal)
                     <form wire:submit='skuCheck' class="w-full space-y-3 p-2">
-                        <label>Штрихкод</label>
-                        <input type="text" wire:model='skuPr' required class="border-2 w-full">
+                        <label class="label">Штрихкод</label>
+                        <input type="text" wire:model='skuPr' required class="border-2 w-full input border-black">
                         <button type="submit"
                             class="bg-black text-white hover:bg-black/70 cursor-pointer px-3 py-1 w-full">Найти</button>
                     </form>
                 @else
                     <form wire:submit='addAuditItem' class="w-full space-y-3 p-2">
-                        <label>Штрихкод</label>
-                        <input type="text" wire:model='skuPr' required class="border-2 w-full">
+                        <label class="label">Штрихкод</label>
+                        <input type="text" wire:model='skuPr' required class="border-2 w-full input">
                         @if ($notPrSc)
-                            <label>Названия</label>
-                            <input type="text" wire:model='namePr' required class="border-2 w-full">
-                            <label>Цена</label>
-                            <input type="text" wire:model='pricePr' required class="border-2 w-full">
+                            <label class="label">Названия</label>
+                            <input type="text" wire:model='namePr' required class="border-2 w-full input">
+                            <label class="label">Цена</label>
+                            <input type="text" wire:model='pricePr' required class="border-2 w-full input">
                         @endif
-                        <label>Количество</label>
-                        <input type="text" wire:model='quantityPr' required class="border-2 w-full">
+                        <label class="label">Количество</label>
+                        <input type="text" wire:model='quantityPr' required class="border-2 w-full input">
                         <button type="submit"
                             class="bg-black text-white hover:bg-black/70 cursor-pointer px-3 py-1 w-full">Обновить /
                             Создать</button>
