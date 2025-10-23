@@ -92,7 +92,6 @@ class Pos extends Component
         if ($product) {
             $this->issetPr = true;
             $this->ProductPr = $product;
-
         } else {
             $this->issetPr = true;
             $this->addProductSection = true;
@@ -243,6 +242,9 @@ class Pos extends Component
                 'discount' => $item->discount,
                 'subtotal' => $item->quantity * $item->product->selling_price,
             ]);
+            $prod = Product::find($item->product_id);
+            $prod->quantity += $item->quantity;
+            $prod->save();
         }
         $this->truncate();
         return redirect()->route('pos');
@@ -261,9 +263,7 @@ class Pos extends Component
                     'phone' => $this->phone,
                     'debt' => $total,
                 ]);
-
             }
-
         }
         if ($this->paymentType == 'В долг') {
             $payment = 'debt';
@@ -289,6 +289,9 @@ class Pos extends Component
                 'discount' => $item->discount,
                 'subtotal' => $item->quantity * $item->product->selling_price,
             ]);
+            $prod = Product::find($item->product_id);
+            $prod->quantity -= $item->quantity;
+            $prod->save();
         }
         if ($this->paymentType == 'В долг') {
             Debt::create([
@@ -307,7 +310,6 @@ class Pos extends Component
             $this->debtModal = true;
         } else {
             $this->debtModal = false;
-
         }
     }
     public function closeCheckoutModal()
@@ -460,7 +462,6 @@ class Pos extends Component
         $this->shift = Shift::latest()->first();
         $this->loadItems();
         $this->calc();
-
     }
     public function loadItems()
     {
@@ -499,13 +500,11 @@ class Pos extends Component
             $item->save();
         }
         $this->calc();
-
     }
     public function deleteitem($id)
     {
         $item = CartItem::find($id)->delete();
         $this->calc();
-
     }
     public function decrement($id)
     {
@@ -515,7 +514,6 @@ class Pos extends Component
             $item->save();
         }
         $this->calc();
-
     }
     public function truncate()
     {
@@ -523,7 +521,6 @@ class Pos extends Component
         Cart::find($this->selectedCart->id)->delete();
         $this->mount();
         $this->calc();
-
     }
     public function addItemToCart($id)
     {
@@ -540,13 +537,11 @@ class Pos extends Component
             ]);
         }
         $this->calc();
-
     }
     public function logout()
     {
         Auth::logout();
         return redirect()->route('login');
-
     }
     public function render()
     {
