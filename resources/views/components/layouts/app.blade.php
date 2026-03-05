@@ -7,6 +7,7 @@
         $manifest = file_exists($manifestPath) ? json_decode(file_get_contents($manifestPath), true) : null;
         $builtCss = $manifest['resources/css/app.css']['file'] ?? null;
         $builtJs = $manifest['resources/js/app.js']['file'] ?? null;
+        $requestBasePath = rtrim(request()->getBaseUrl(), '/');
 
         $assetPrefix = '/build';
         if ($builtCss) {
@@ -24,10 +25,10 @@
         }
 
         $fallbackAssetPrefix = $assetPrefix === '/build' ? '/public/build' : '/build';
-        $manifestPrefix = str_starts_with($assetPrefix, '/public/') ? '/public' : '';
-        $manifestUrl = $manifestPrefix . '/manifest.webmanifest';
-        $swUrl = $manifestPrefix . '/sw.js';
-        $swScope = $manifestPrefix === '' ? '/' : $manifestPrefix . '/';
+        $manifestUrl = $requestBasePath . '/manifest.webmanifest';
+        $swUrl = $requestBasePath . '/sw.js';
+        $swScope = $requestBasePath === '' ? '/' : $requestBasePath . '/';
+        $pwaEnabled = true;
     @endphp
 
     <meta charset="utf-8">
@@ -36,7 +37,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="pos-sw-url" content="{{ $swUrl }}">
     <meta name="pos-sw-scope" content="{{ $swScope }}">
-    <meta name="pos-pwa-enabled" content="0">
+    <meta name="pos-pwa-enabled" content="{{ $pwaEnabled ? '1' : '0' }}">
     <link rel="manifest" href="{{ $manifestUrl }}">
 
     <title>{{ $title ?? 'Page Title' }}</title>

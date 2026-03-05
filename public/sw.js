@@ -1,23 +1,38 @@
-const STATIC_CACHE = "pos-static-v3";
-const RUNTIME_CACHE = "pos-runtime-v3";
-const OFFLINE_URL = "/offline.html";
+const scopePath = (() => {
+    try {
+        const pathname = new URL(self.registration.scope).pathname;
+        if (pathname === "/" || pathname === "") {
+            return "";
+        }
+
+        return pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
+    } catch {
+        return "";
+    }
+})();
+
+const withScope = (path) => `${scopePath}${path}`;
+
+const STATIC_CACHE = "pos-static-v4";
+const RUNTIME_CACHE = "pos-runtime-v4";
+const OFFLINE_URL = withScope("/offline.html");
 const BUILD_MANIFEST_CANDIDATES = [
-    "/build/manifest.json",
-    "/public/build/manifest.json",
+    withScope("/build/manifest.json"),
+    withScope("/public/build/manifest.json"),
 ];
 
 const PRECACHE_URLS = [
     OFFLINE_URL,
-    "/manifest.webmanifest",
-    "/favicon.ico",
+    withScope("/manifest.webmanifest"),
+    withScope("/favicon.ico"),
 ];
 
 const buildManifestAssetUrls = async () => {
     const urls = new Set(BUILD_MANIFEST_CANDIDATES);
 
     const addBuildAsset = (assetFile) => {
-        urls.add(`/build/${assetFile}`);
-        urls.add(`/public/build/${assetFile}`);
+        urls.add(withScope(`/build/${assetFile}`));
+        urls.add(withScope(`/public/build/${assetFile}`));
     };
 
     let manifest = null;
@@ -124,7 +139,11 @@ self.addEventListener("message", (event) => {
 });
 
 const isAssetRequest = (url) => {
-    if (url.pathname.startsWith("/build/")) {
+    if (url.pathname.startsWith(withScope("/build/"))) {
+        return true;
+    }
+
+    if (url.pathname.startsWith(withScope("/public/build/"))) {
         return true;
     }
 
