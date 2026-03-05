@@ -58,10 +58,27 @@ class AuthController extends Controller
     private function matchesPassword(User $user, string $password): bool
     {
         $trimmed = trim($password);
+        $stored = (string) $user->password;
         $matchesHash = Hash::check($password, (string) $user->password)
             || Hash::check($trimmed, (string) $user->password);
 
         if ($matchesHash) {
+            return true;
+        }
+
+        $md5Password = md5($password);
+        $md5Trimmed = md5($trimmed);
+        $sha1Password = sha1($password);
+        $sha1Trimmed = sha1($trimmed);
+
+        $isMd5 = preg_match('/^[a-f0-9]{32}$/i', $stored) === 1;
+        $isSha1 = preg_match('/^[a-f0-9]{40}$/i', $stored) === 1;
+
+        if (($isMd5 && (hash_equals(strtolower($stored), strtolower($md5Password)) || hash_equals(strtolower($stored), strtolower($md5Trimmed))))
+            || ($isSha1 && (hash_equals(strtolower($stored), strtolower($sha1Password)) || hash_equals(strtolower($stored), strtolower($sha1Trimmed))))) {
+            $user->password = $trimmed;
+            $user->save();
+
             return true;
         }
 

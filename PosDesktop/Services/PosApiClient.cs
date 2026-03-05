@@ -1,4 +1,6 @@
 using System.Net.Http.Headers;
+using System.Net;
+using System.Text.RegularExpressions;
 using System.Text;
 using System.Text.Json;
 using PosDesktop.Models.Api;
@@ -23,6 +25,8 @@ public sealed class PosApiClient
         {
             Timeout = TimeSpan.FromSeconds(30),
         };
+        _httpClient.DefaultRequestHeaders.Accept.Clear();
+        _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
     }
 
     public void SetBearerToken(string token)
@@ -198,6 +202,25 @@ public sealed class PosApiClient
             return "Unknown API error";
         }
 
+        if (LooksLikeHtml(responseText))
+        {
+            var decoded = WebUtility.HtmlDecode(responseText);
+
+            if (decoded.Contains("api_access_tokens", StringComparison.OrdinalIgnoreCase)
+                && decoded.Contains("doesn't exist", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Ошибка сервера: отсутствует таблица api_access_tokens. Выполните миграции на хостинге.";
+            }
+
+            var sqlStateMatch = Regex.Match(decoded, @"SQLSTATE\[[^\]]+\][^\r\n<]{0,350}", RegexOptions.IgnoreCase);
+            if (sqlStateMatch.Success)
+            {
+                return "Ошибка API: " + sqlStateMatch.Value.Trim();
+            }
+
+            return "Сервер вернул HTML-ошибку вместо JSON. Проверьте миграции и логи Laravel.";
+        }
+
         try
         {
             using var document = JsonDocument.Parse(responseText);
@@ -216,5 +239,11 @@ public sealed class PosApiClient
         }
 
         return responseText.Length > 300 ? responseText[..300] : responseText;
+    }
+
+    private static bool LooksLikeHtml(string value)
+    {
+        return value.Contains("<!DOCTYPE html", StringComparison.OrdinalIgnoreCase)
+               || value.Contains("<html", StringComparison.OrdinalIgnoreCase);
     }
 }
