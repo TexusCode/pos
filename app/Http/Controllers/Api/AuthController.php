@@ -20,9 +20,12 @@ class AuthController extends Controller
             'token_ttl_hours' => ['nullable', 'integer', 'min:1', 'max:720'],
         ]);
 
-        $user = User::query()->where('phone', $payload['phone'])->first();
+        $phone = trim((string) $payload['phone']);
+        $password = (string) $payload['password'];
 
-        if (!$user || !Hash::check($payload['password'], $user->password)) {
+        $user = $this->resolveUserByPhone($phone);
+
+        if (!$user || !$this->matchesPassword($user, $password)) {
             return response()->json([
                 'message' => 'Invalid credentials',
             ], 422);
@@ -50,6 +53,62 @@ class AuthController extends Controller
                 'role' => $user->role,
             ],
         ]);
+    }
+
+    private function matchesPassword(User $user, string $password): bool
+    {
+        $trimmed = trim($password);
+        $matchesHash = Hash::check($password, (string) $user->password)
+            || Hash::check($trimmed, (string) $user->password);
+
+        if ($matchesHash) {
+            return true;
+        }
+
+        // Legacy fallback for old plain passwords; once matched we upgrade to hashed.
+        if ($password === $user->password || $trimmed === $user->password) {
+            $user->password = $trimmed;
+            $user->save();
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private function resolveUserByPhone(string $rawPhone): ?User
+    {
+        $normalized = $this->normalizePhone($rawPhone);
+        $tail = mb_substr($normalized, -9);
+
+        $exact = User::query()
+            ->where('phone', $rawPhone)
+            ->orWhere('phone', $normalized)
+            ->orWhere('phone', '+' . $normalized)
+            ->first();
+
+        if ($exact) {
+            return $exact;
+        }
+
+        $candidates = User::query()
+            ->where('phone', 'like', '%' . $tail)
+            ->limit(30)
+            ->get();
+
+        foreach ($candidates as $candidate) {
+            $candidateNormalized = $this->normalizePhone((string) $candidate->phone);
+            if ($candidateNormalized === $normalized || mb_substr($candidateNormalized, -9) === $tail) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private function normalizePhone(string $value): string
+    {
+        return preg_replace('/\D+/', '', $value) ?? '';
     }
 
     public function me(Request $request)

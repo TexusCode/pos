@@ -233,7 +233,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 response = await _apiClient.LoginAsync(new LoginRequest
                 {
                     Phone = Phone.Trim(),
-                    Password = Password,
+                    Password = Password.Trim(),
                     DeviceName = Environment.MachineName,
                 });
             }
