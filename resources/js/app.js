@@ -1,9 +1,19 @@
 import './bootstrap';
 
+const basePathMeta = document.querySelector('meta[name="pos-base-path"]');
+const pwaEnabledMeta = document.querySelector('meta[name="pos-pwa-enabled"]');
+const basePath = (basePathMeta?.content || '').replace(/\/$/, '');
+const pwaEnabled = pwaEnabledMeta?.content === '1';
+
 const syncOfflineIndicator = () => {
     const indicator = document.getElementById('offline-indicator');
 
     if (!indicator) {
+        return;
+    }
+
+    if (!pwaEnabled) {
+        indicator.classList.add('hidden');
         return;
     }
 
@@ -19,10 +29,25 @@ window.addEventListener('offline', syncOfflineIndicator);
 window.addEventListener('load', syncOfflineIndicator);
 
 if ('serviceWorker' in navigator) {
+    if (!pwaEnabled) {
+        navigator.serviceWorker.getRegistrations().then((registrations) => {
+            registrations.forEach((registration) => {
+                registration.unregister();
+            });
+        });
+    }
+
     window.addEventListener('load', async () => {
+        if (!pwaEnabled) {
+            return;
+        }
+
+        const swUrl = `${basePath}/sw.js`;
+        const swScope = `${basePath || ''}/`;
+
         try {
-            const registration = await navigator.serviceWorker.register('/sw.js', {
-                scope: '/',
+            const registration = await navigator.serviceWorker.register(swUrl, {
+                scope: swScope,
             });
 
             if (registration.waiting) {

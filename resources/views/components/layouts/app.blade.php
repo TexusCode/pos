@@ -7,17 +7,21 @@
         $manifest = file_exists($manifestPath) ? json_decode(file_get_contents($manifestPath), true) : null;
         $builtCss = $manifest['resources/css/app.css']['file'] ?? null;
         $builtJs = $manifest['resources/js/app.js']['file'] ?? null;
+        $basePath = rtrim(request()->getBaseUrl(), '/');
+        $pathPrefix = $basePath === '' ? '' : $basePath;
     @endphp
 
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#10b981">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="pos-base-path" content="{{ $pathPrefix }}">
+    <meta name="pos-pwa-enabled" content="0">
+    <link rel="manifest" href="{{ $pathPrefix . '/manifest.webmanifest' }}">
 
     <title>{{ $title ?? 'Page Title' }}</title>
     @if ($builtCss)
-        <link rel="stylesheet" href="{{ '/build/' . $builtCss }}" data-navigate-track="reload">
+        <link rel="stylesheet" href="{{ $pathPrefix . '/build/' . $builtCss }}" data-navigate-track="reload">
     @elseif (file_exists(public_path('hot')))
         @vite('resources/css/app.css')
     @endif
@@ -33,7 +37,7 @@
     {{ $slot }}
     @fluxScripts
     @if ($builtJs)
-        <script type="module" src="{{ '/build/' . $builtJs }}" data-navigate-track="reload"></script>
+        <script type="module" src="{{ $pathPrefix . '/build/' . $builtJs }}" data-navigate-track="reload"></script>
     @elseif (file_exists(public_path('hot')))
         @vite('resources/js/app.js')
     @endif
