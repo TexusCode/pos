@@ -30,6 +30,14 @@
                     BorderThickness="1"
                     Background="White">
                 <StackPanel Spacing="14">
+                    <Border IsVisible="{Binding IsOfflineMode}"
+                            CornerRadius="10"
+                            Padding="10,6"
+                            Background="#FEF3C7"
+                            Margin="0,0,0,6">
+                        <TextBlock Text="Оффлайн режим: вход возможен только по уже сохраненной сессии"
+                                   Foreground="#92400E" />
+                    </Border>
                     <TextBlock Text="Вход в систему"
                                FontWeight="SemiBold"
                                FontSize="30"
@@ -77,6 +85,14 @@
                     BorderThickness="1"
                     Background="White">
                 <StackPanel Spacing="14">
+                    <Border IsVisible="{Binding IsOfflineMode}"
+                            CornerRadius="10"
+                            Padding="10,6"
+                            Background="#FEF3C7"
+                            Margin="0,0,0,6">
+                        <TextBlock Text="Оффлайн режим: открытие/закрытие смены синхронизируется автоматически"
+                                   Foreground="#92400E" />
+                    </Border>
                     <TextBlock Text="Создание смены"
                                FontWeight="SemiBold"
                                FontSize="30"
@@ -116,6 +132,13 @@
               RowDefinitions="Auto,*"
               Margin="14">
             <StackPanel Grid.Row="0" Spacing="8" Margin="0,0,0,8">
+                <Border IsVisible="{Binding IsOfflineMode}"
+                        CornerRadius="10"
+                        Padding="12,8"
+                        Background="#FEF3C7">
+                    <TextBlock Text="{Binding ConnectionStatusLabel, StringFormat=Режим: {0}. Данные будут синхронизированы после восстановления сети}"
+                               Foreground="#92400E" />
+                </Border>
                 <Border IsVisible="{Binding HasErrorMessage}"
                         CornerRadius="10"
                         Padding="12,8"

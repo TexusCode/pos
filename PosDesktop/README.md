@@ -39,3 +39,8 @@ dotnet run --project PosDesktop.csproj
 - Cart discount (fixed/percent)
 - Checkout (cash/card/debt)
 - Cart reset
+- Offline-first mode:
+  - local SQLite cache for user, shift, products, carts
+  - all кассовые действия сохраняются локально без интернета
+  - automatic background sync every few seconds when internet is back
+  - queued operations are pushed to server and local state aligns with web API

@@ -1,11 +1,16 @@
-﻿using System;
+using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Linq;
+using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using PosDesktop.Models.Api;
+using PosDesktop.Models.Local;
 using PosDesktop.Services;
 
 namespace PosDesktop.ViewModels;
@@ -20,15 +25,27 @@ public enum AppScreen
 public partial class MainWindowViewModel : ViewModelBase
 {
     private readonly PosApiClient _apiClient;
+    private readonly LocalPosStore _localStore;
+    private readonly SemaphoreSlim _syncGate = new(1, 1);
+    private readonly DispatcherTimer _syncTimer;
     private string? _accessToken;
 
     public MainWindowViewModel()
     {
         var config = ConfigLoader.Load();
         ApiBaseUrl = config.ApiBaseUrl;
-        _apiClient = new PosApiClient(config.ApiBaseUrl);
 
-        _ = TryRestoreSessionAsync();
+        _apiClient = new PosApiClient(config.ApiBaseUrl);
+        _localStore = new LocalPosStore();
+
+        _syncTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(6),
+        };
+        _syncTimer.Tick += SyncTimerOnTick;
+        _syncTimer.Start();
+
+        _ = BootstrapAsync();
     }
 
     public string ApiBaseUrl { get; }
@@ -44,6 +61,9 @@ public partial class MainWindowViewModel : ViewModelBase
 
     [ObservableProperty]
     private bool _isBusy;
+
+    [ObservableProperty]
+    private bool _isOfflineMode;
 
     [ObservableProperty]
     private string _errorMessage = string.Empty;
@@ -125,6 +145,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public string ShiftNumberLabel => CurrentShift is null ? "-" : $"Смена №{CurrentShift.Id}";
     public string UserNameLabel => CurrentUser?.Name ?? "Кассир";
+    public string ConnectionStatusLabel => IsOfflineMode ? "Оффлайн" : "Онлайн";
 
     partial void OnCurrentScreenChanged(AppScreen value)
     {
@@ -150,7 +171,7 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             foreach (var item in value.Items)
             {
-                CartItems.Add(item);
+                CartItems.Add(CloneCartItem(item));
             }
         }
 
@@ -181,6 +202,21 @@ public partial class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(HasStatusMessage));
     }
 
+    partial void OnSearchTextChanged(string value)
+    {
+        if (!IsPosScreen)
+        {
+            return;
+        }
+
+        _ = LoadProductsFromLocalAsync();
+    }
+
+    partial void OnIsOfflineModeChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ConnectionStatusLabel));
+    }
+
     [RelayCommand]
     private async Task LoginAsync()
     {
@@ -191,21 +227,36 @@ public partial class MainWindowViewModel : ViewModelBase
                 throw new InvalidOperationException("Введите номер телефона и пароль");
             }
 
-            var response = await _apiClient.LoginAsync(new LoginRequest
+            LoginResponse response;
+            try
             {
-                Phone = Phone.Trim(),
-                Password = Password,
-                DeviceName = Environment.MachineName,
-            });
+                response = await _apiClient.LoginAsync(new LoginRequest
+                {
+                    Phone = Phone.Trim(),
+                    Password = Password,
+                    DeviceName = Environment.MachineName,
+                });
+            }
+            catch (Exception ex) when (IsConnectivityException(ex))
+            {
+                SetOfflineMode(true);
+                throw new InvalidOperationException("Нет сети. Первый вход в систему возможен только онлайн.");
+            }
 
+            SetOfflineMode(false);
             _accessToken = response.AccessToken;
             _apiClient.SetBearerToken(response.AccessToken);
             SessionStore.SaveToken(response.AccessToken);
+
             CurrentUser = response.User;
+            await _localStore.SaveCachedUserAsync(response.User);
 
             Password = string.Empty;
 
-            await LoadScreenByShiftAsync();
+            await TrySyncNowAsync(forcePullFromServer: true, silent: true);
+            await LoadLocalShiftAsync();
+            await RouteByShiftStateAsync();
+
             StatusMessage = "Успешный вход";
         });
     }
@@ -215,7 +266,7 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         await ExecuteBusyAsync(async () =>
         {
-            if (!string.IsNullOrWhiteSpace(_accessToken))
+            if (!string.IsNullOrWhiteSpace(_accessToken) && !IsOfflineMode)
             {
                 try
                 {
@@ -223,11 +274,11 @@ public partial class MainWindowViewModel : ViewModelBase
                 }
                 catch
                 {
-                    // Ignore logout failure, local session cleanup is enough.
+                    // Logout API failure should not block local cleanup.
                 }
             }
 
-            ClearSession();
+            await ClearSessionAsync();
             StatusMessage = "Вы вышли из системы";
         });
     }
@@ -237,12 +288,59 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         await ExecuteBusyAsync(async () =>
         {
+            if (CurrentUser is null)
+            {
+                throw new InvalidOperationException("Требуется авторизация");
+            }
+
             var initialCash = ParseMoney(InitialCashInput);
-            var response = await _apiClient.OpenShiftAsync(initialCash);
-            CurrentShift = response.Shift;
+            ShiftDto shift;
+            var synced = false;
+
+            if (!IsOfflineMode)
+            {
+                try
+                {
+                    var response = await _apiClient.OpenShiftAsync(initialCash);
+                    shift = response.Shift;
+                    await _localStore.ClearPendingShiftOpenAsync();
+                    synced = true;
+                }
+                catch (ApiException ex) when (ex.StatusCode == 422 && ex.Message.Contains("already open", StringComparison.OrdinalIgnoreCase))
+                {
+                    var current = await _apiClient.GetCurrentShiftAsync();
+                    shift = current.Shift ?? throw new InvalidOperationException("Смена уже открыта, но сервер не вернул данные");
+                    synced = true;
+                }
+                catch (Exception ex) when (IsConnectivityException(ex))
+                {
+                    SetOfflineMode(true);
+                    shift = BuildLocalOpenShift(initialCash);
+                    await _localStore.SetPendingShiftOpenAsync(initialCash);
+                }
+            }
+            else
+            {
+                shift = BuildLocalOpenShift(initialCash);
+                await _localStore.SetPendingShiftOpenAsync(initialCash);
+            }
+
+            CurrentShift = shift;
+            await _localStore.SaveShiftAsync(shift);
+
             CurrentScreen = AppScreen.Pos;
-            await LoadPosDataAsync();
-            StatusMessage = "Смена открыта";
+            await LoadProductsFromLocalAsync();
+            await EnsureActiveCartAsync();
+
+            if (synced)
+            {
+                _ = TrySyncNowAsync(forcePullFromServer: true, silent: true);
+                StatusMessage = "Смена открыта";
+            }
+            else
+            {
+                StatusMessage = "Смена открыта офлайн. Синхронизация выполнится при появлении сети";
+            }
         });
     }
 
@@ -257,25 +355,69 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         await ExecuteBusyAsync(async () =>
         {
-            var finalCash = ParseMoney(FinalCashInput);
-            var response = await _apiClient.CloseShiftAsync(finalCash);
+            if (CurrentUser is null)
+            {
+                throw new InvalidOperationException("Требуется авторизация");
+            }
 
-            CurrentShift = response.Shift;
+            var finalCash = ParseMoney(FinalCashInput);
+            var synced = false;
+            ShiftDto closedShift;
+
+            if (!IsOfflineMode)
+            {
+                try
+                {
+                    await TrySyncNowAsync(forcePullFromServer: false, silent: true);
+                    var response = await _apiClient.CloseShiftAsync(finalCash);
+                    closedShift = response.Shift;
+                    await _localStore.ClearPendingShiftCloseAsync();
+                    await _localStore.ClearPendingShiftOpenAsync();
+                    await _localStore.ClearUserCartsAsync(CurrentUser.Id.ToString(CultureInfo.InvariantCulture));
+                    synced = true;
+                }
+                catch (Exception ex) when (IsConnectivityException(ex))
+                {
+                    SetOfflineMode(true);
+                    closedShift = BuildLocalCloseShift(finalCash);
+                    await _localStore.SetPendingShiftCloseAsync(finalCash);
+                }
+            }
+            else
+            {
+                closedShift = BuildLocalCloseShift(finalCash);
+                await _localStore.SetPendingShiftCloseAsync(finalCash);
+            }
+
+            CurrentShift = closedShift;
+            await _localStore.SaveShiftAsync(closedShift);
+
             IsCloseShiftDialogOpen = false;
             CurrentScreen = AppScreen.Shift;
-            Carts.Clear();
-            CartItems.Clear();
-            Products.Clear();
-            SelectedCart = null;
 
-            StatusMessage = "Смена закрыта";
+            if (synced)
+            {
+                Carts.Clear();
+                CartItems.Clear();
+                SelectedCart = null;
+                OnPropertyChanged(nameof(CartCount));
+                StatusMessage = "Смена закрыта";
+            }
+            else
+            {
+                StatusMessage = "Закрытие смены поставлено в очередь. Синхронизация выполнится при появлении сети";
+            }
         });
     }
 
     [RelayCommand]
     private async Task RefreshProductsAsync()
     {
-        await ExecuteBusyAsync(async () => { await LoadProductsAsync(); });
+        await ExecuteBusyAsync(async () =>
+        {
+            await LoadProductsFromLocalAsync();
+            _ = TrySyncNowAsync(forcePullFromServer: true, silent: true);
+        });
     }
 
     [RelayCommand]
@@ -288,13 +430,14 @@ public partial class MainWindowViewModel : ViewModelBase
                 return;
             }
 
-            await AddItemToCurrentCartAsync(new AddCartItemRequest
+            await AddItemToCurrentCartLocalAsync(new AddCartItemRequest
             {
                 Sku = BarcodeInput.Trim(),
                 Quantity = 1,
             });
 
             BarcodeInput = string.Empty;
+            _ = TrySyncNowAsync(forcePullFromServer: false, silent: true);
         });
     }
 
@@ -308,11 +451,13 @@ public partial class MainWindowViewModel : ViewModelBase
 
         await ExecuteBusyAsync(async () =>
         {
-            await AddItemToCurrentCartAsync(new AddCartItemRequest
+            await AddItemToCurrentCartLocalAsync(new AddCartItemRequest
             {
                 ProductId = product.Id,
                 Quantity = 1,
             });
+
+            _ = TrySyncNowAsync(forcePullFromServer: false, silent: true);
         });
     }
 
@@ -326,10 +471,14 @@ public partial class MainWindowViewModel : ViewModelBase
 
         await ExecuteBusyAsync(async () =>
         {
-            var response = await _apiClient.GetCartAsync(cart.Id);
-            UpsertCart(response.Cart);
-            SelectedCart = response.Cart;
-        });
+            if (CurrentUser is null)
+            {
+                return;
+            }
+
+            var record = await _localStore.GetCartRecordAsync(CurrentUser.Id.ToString(CultureInfo.InvariantCulture), cart.Id);
+            SelectedCart = record is null ? cart : CloneCart(record.Cart);
+        }, clearMessages: false);
     }
 
     [RelayCommand]
@@ -337,8 +486,8 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         await ExecuteBusyAsync(async () =>
         {
-            var response = await _apiClient.CreateCartAsync();
-            await RefreshCartsAsync(response.Cart.Id);
+            await CreateAndSelectNewLocalCartAsync();
+            _ = TrySyncNowAsync(forcePullFromServer: false, silent: true);
             StatusMessage = "Новая корзина создана";
         });
     }
@@ -346,15 +495,28 @@ public partial class MainWindowViewModel : ViewModelBase
     [RelayCommand]
     private async Task ResetCartAsync()
     {
-        if (SelectedCart is null)
+        if (SelectedCart is null || CurrentUser is null)
         {
             return;
         }
 
         await ExecuteBusyAsync(async () =>
         {
-            await _apiClient.DeleteCartAsync(SelectedCart.Id);
-            await RefreshCartsAsync();
+            var record = await _localStore.GetCartRecordAsync(CurrentUser.Id.ToString(CultureInfo.InvariantCulture), SelectedCart.Id);
+            if (record is null)
+            {
+                return;
+            }
+
+            record.State = LocalCartStates.Deleted;
+            record.IsDirty = true;
+            record.PendingCheckout = null;
+            await _localStore.SaveCartRecordAsync(record);
+
+            RemoveCartFromCollection(record.ClientId);
+            await EnsureActiveCartAsync();
+
+            _ = TrySyncNowAsync(forcePullFromServer: false, silent: true);
             StatusMessage = "Корзина очищена";
         });
     }
@@ -369,17 +531,20 @@ public partial class MainWindowViewModel : ViewModelBase
 
         await ExecuteBusyAsync(async () =>
         {
-            var response = await _apiClient.UpdateCartItemAsync(
-                SelectedCart.Id,
-                item.Id,
-                new UpdateCartItemRequest
-                {
-                    Quantity = item.Quantity + 1,
-                });
+            var cart = CloneCart(SelectedCart);
+            var localItem = cart.Items.FirstOrDefault(x => x.Id == item.Id);
+            if (localItem is null)
+            {
+                return;
+            }
 
-            UpsertCart(response.Cart);
-            SelectedCart = response.Cart;
-        });
+            localItem.Quantity += 1;
+            localItem.LineSubtotal = Round2(localItem.Price * localItem.Quantity);
+
+            RecalculateCart(cart);
+            await SaveActiveCartAsync(cart, isDirty: true);
+            _ = TrySyncNowAsync(forcePullFromServer: false, silent: true);
+        }, clearMessages: false);
     }
 
     [RelayCommand]
@@ -392,25 +557,27 @@ public partial class MainWindowViewModel : ViewModelBase
 
         await ExecuteBusyAsync(async () =>
         {
-            if (item.Quantity <= 1)
+            var cart = CloneCart(SelectedCart);
+            var localItem = cart.Items.FirstOrDefault(x => x.Id == item.Id);
+            if (localItem is null)
             {
-                var removeResponse = await _apiClient.RemoveCartItemAsync(SelectedCart.Id, item.Id);
-                UpsertCart(removeResponse.Cart);
-                SelectedCart = removeResponse.Cart;
                 return;
             }
 
-            var updateResponse = await _apiClient.UpdateCartItemAsync(
-                SelectedCart.Id,
-                item.Id,
-                new UpdateCartItemRequest
-                {
-                    Quantity = item.Quantity - 1,
-                });
+            if (localItem.Quantity <= 1)
+            {
+                cart.Items.Remove(localItem);
+            }
+            else
+            {
+                localItem.Quantity -= 1;
+                localItem.LineSubtotal = Round2(localItem.Price * localItem.Quantity);
+            }
 
-            UpsertCart(updateResponse.Cart);
-            SelectedCart = updateResponse.Cart;
-        });
+            RecalculateCart(cart);
+            await SaveActiveCartAsync(cart, isDirty: true);
+            _ = TrySyncNowAsync(forcePullFromServer: false, silent: true);
+        }, clearMessages: false);
     }
 
     [RelayCommand]
@@ -423,10 +590,18 @@ public partial class MainWindowViewModel : ViewModelBase
 
         await ExecuteBusyAsync(async () =>
         {
-            var response = await _apiClient.RemoveCartItemAsync(SelectedCart.Id, item.Id);
-            UpsertCart(response.Cart);
-            SelectedCart = response.Cart;
-        });
+            var cart = CloneCart(SelectedCart);
+            var localItem = cart.Items.FirstOrDefault(x => x.Id == item.Id);
+            if (localItem is null)
+            {
+                return;
+            }
+
+            cart.Items.Remove(localItem);
+            RecalculateCart(cart);
+            await SaveActiveCartAsync(cart, isDirty: true);
+            _ = TrySyncNowAsync(forcePullFromServer: false, silent: true);
+        }, clearMessages: false);
     }
 
     [RelayCommand]
@@ -450,17 +625,22 @@ public partial class MainWindowViewModel : ViewModelBase
                 throw new InvalidOperationException("Введите сумму скидки");
             }
 
+            var cart = CloneCart(SelectedCart);
             var discountValue = ParseMoney(DiscountValueInput);
-            var response = await _apiClient.ApplyDiscountAsync(SelectedCart.Id, new ApplyDiscountRequest
-            {
-                Type = DiscountType,
-                Value = discountValue,
-            });
 
-            UpsertCart(response.Cart);
-            SelectedCart = response.Cart;
+            var subtotalRaw = cart.Items.Sum(x => x.Price * x.Quantity);
+            var discount = DiscountType == "percent"
+                ? Round2((subtotalRaw * discountValue) / 100m)
+                : discountValue;
+
+            cart.Discount = Math.Max(0, discount);
+            RecalculateCart(cart);
+
+            await SaveActiveCartAsync(cart, isDirty: true);
             IsDiscountDialogOpen = false;
             DiscountValueInput = string.Empty;
+
+            _ = TrySyncNowAsync(forcePullFromServer: false, silent: true);
             StatusMessage = "Скидка применена";
         });
     }
@@ -474,14 +654,14 @@ public partial class MainWindowViewModel : ViewModelBase
     [RelayCommand]
     private async Task CheckoutAsync()
     {
-        if (SelectedCart is null)
+        if (SelectedCart is null || CurrentUser is null)
         {
             return;
         }
 
         await ExecuteBusyAsync(async () =>
         {
-            var request = new CheckoutRequest
+            var checkoutRequest = new CheckoutRequest
             {
                 PaymentMethod = PaymentMethod,
                 PaymentStatus = IsDebtPayment ? "debt" : "paid",
@@ -491,76 +671,196 @@ public partial class MainWindowViewModel : ViewModelBase
                 Notes = string.IsNullOrWhiteSpace(OrderNote) ? null : OrderNote.Trim(),
             };
 
-            if (request.PaymentStatus == "debt" && string.IsNullOrWhiteSpace(request.CustomerPhone))
+            if (checkoutRequest.PaymentStatus == "debt" && string.IsNullOrWhiteSpace(checkoutRequest.CustomerPhone))
             {
                 throw new InvalidOperationException("Для оплаты в долг укажите телефон клиента");
             }
 
-            await _apiClient.CheckoutAsync(SelectedCart.Id, request);
-            await RefreshCartsAsync();
-            await LoadProductsAsync();
+            var cart = CloneCart(SelectedCart);
+            if (cart.Items.Count == 0)
+            {
+                throw new InvalidOperationException("Корзина пустая");
+            }
+
+            var userId = CurrentUser.Id.ToString(CultureInfo.InvariantCulture);
+            var record = await _localStore.GetCartRecordAsync(userId, cart.Id)
+                         ?? new LocalCartRecord
+                         {
+                             ClientId = cart.Id,
+                             UserId = userId,
+                             Cart = cart,
+                             State = LocalCartStates.Active,
+                             IsDirty = true,
+                         };
+
+            var synced = false;
+
+            if (!IsOfflineMode)
+            {
+                try
+                {
+                    var serverCartId = await PushCartSnapshotToServerAsync(record);
+                    await _apiClient.CheckoutAsync(serverCartId, checkoutRequest);
+                    synced = true;
+                }
+                catch (Exception ex) when (IsConnectivityException(ex))
+                {
+                    SetOfflineMode(true);
+                }
+            }
+
+            if (synced)
+            {
+                await _localStore.DeleteCartPermanentlyAsync(userId, cart.Id);
+                RemoveCartFromCollection(cart.Id);
+                StatusMessage = "Продажа оформлена";
+            }
+            else
+            {
+                record.State = LocalCartStates.CheckoutPending;
+                record.IsDirty = true;
+                record.PendingCheckout = checkoutRequest;
+                await _localStore.SaveCartRecordAsync(record);
+                StatusMessage = "Продажа сохранена офлайн и будет отправлена при появлении сети";
+            }
+
+            await DecreaseLocalProductStockAsync(cart.Items);
+            if (synced)
+            {
+                await TrySyncNowAsync(forcePullFromServer: true, silent: true);
+                await EnsureActiveCartAsync();
+            }
+            else
+            {
+                await RemoveAndRecreateWorkingCartAsync(cart.Id);
+                _ = TrySyncNowAsync(forcePullFromServer: true, silent: true);
+            }
+
             IsCheckoutDialogOpen = false;
             CashInput = "0";
             CustomerName = string.Empty;
             CustomerPhone = string.Empty;
             OrderNote = string.Empty;
             PaymentMethod = "Наличными";
-
-            StatusMessage = "Продажа оформлена";
         });
     }
 
     [RelayCommand]
     private async Task RefreshAllAsync()
     {
-        await ExecuteBusyAsync(async () => { await LoadPosDataAsync(); });
+        await ExecuteBusyAsync(async () =>
+        {
+            await LoadLocalShiftAsync();
+            await LoadProductsFromLocalAsync();
+            await LoadCartsFromLocalAsync(SelectedCart?.Id);
+            _ = TrySyncNowAsync(forcePullFromServer: true, silent: true);
+        });
+    }
+
+    private async void SyncTimerOnTick(object? sender, EventArgs e)
+    {
+        await TrySyncNowAsync(forcePullFromServer: false, silent: true);
+    }
+
+    private async Task BootstrapAsync()
+    {
+        await ExecuteBusyAsync(async () =>
+        {
+            await _localStore.InitializeAsync();
+            await TryRestoreSessionAsync();
+        }, clearMessages: false);
     }
 
     private async Task TryRestoreSessionAsync()
     {
+        var cachedUser = await _localStore.LoadCachedUserAsync();
+        if (cachedUser is not null)
+        {
+            CurrentUser = cachedUser;
+        }
+
+        await LoadLocalShiftAsync();
+        await LoadProductsFromLocalAsync();
+
+        if (cachedUser is not null)
+        {
+            await LoadCartsFromLocalAsync();
+        }
+
         var token = SessionStore.LoadToken();
         if (string.IsNullOrWhiteSpace(token))
         {
+            CurrentScreen = AppScreen.Login;
             return;
         }
 
-        await ExecuteBusyAsync(async () =>
+        _accessToken = token;
+        _apiClient.SetBearerToken(token);
+
+        try
         {
-            _accessToken = token;
-            _apiClient.SetBearerToken(token);
             var me = await _apiClient.MeAsync();
             CurrentUser = me.User;
-            await LoadScreenByShiftAsync();
+            await _localStore.SaveCachedUserAsync(me.User);
+            SetOfflineMode(false);
+
+            await TrySyncNowAsync(forcePullFromServer: true, silent: true);
+            await RouteByShiftStateAsync();
+
             StatusMessage = "Сессия восстановлена";
-        }, silentError: true);
+        }
+        catch (ApiException ex) when (ex.StatusCode == 401)
+        {
+            await ClearSessionAsync();
+        }
+        catch (Exception ex) when (IsConnectivityException(ex))
+        {
+            SetOfflineMode(true);
+
+            if (CurrentUser is null)
+            {
+                CurrentScreen = AppScreen.Login;
+                ErrorMessage = "Нет сети. Для входа требуется интернет.";
+                return;
+            }
+
+            await RouteByShiftStateAsync();
+            StatusMessage = "Оффлайн режим активирован";
+        }
     }
 
-    private async Task LoadScreenByShiftAsync()
+    private async Task RouteByShiftStateAsync()
     {
-        var shiftResponse = await _apiClient.GetCurrentShiftAsync();
-        CurrentShift = shiftResponse.Shift;
+        if (CurrentUser is null)
+        {
+            CurrentScreen = AppScreen.Login;
+            return;
+        }
 
-        if (shiftResponse.Shift is not null && shiftResponse.Shift.Status == "open")
+        await LoadLocalShiftAsync();
+
+        if (CurrentShift is not null && CurrentShift.Status == "open")
         {
             CurrentScreen = AppScreen.Pos;
-            await LoadPosDataAsync();
+            await LoadProductsFromLocalAsync();
+            await EnsureActiveCartAsync();
             return;
         }
 
         CurrentScreen = AppScreen.Shift;
     }
 
-    private async Task LoadPosDataAsync()
+    private async Task LoadLocalShiftAsync()
     {
-        await LoadProductsAsync();
-        await RefreshCartsAsync();
+        CurrentShift = await _localStore.LoadShiftAsync();
     }
 
-    private async Task LoadProductsAsync()
+    private async Task LoadProductsFromLocalAsync()
     {
-        var response = await _apiClient.GetProductsAsync(SearchText);
+        var products = await _localStore.LoadProductsAsync(SearchText);
+
         Products.Clear();
-        foreach (var product in response.Items)
+        foreach (var product in products)
         {
             Products.Add(product);
         }
@@ -568,16 +868,19 @@ public partial class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(ProductCount));
     }
 
-    private async Task RefreshCartsAsync(int? preferredCartId = null)
+    private async Task LoadCartsFromLocalAsync(int? preferredCartId = null)
     {
-        var response = await _apiClient.GetCartsAsync();
-        var carts = response.Items.OrderByDescending(x => x.Id).ToList();
-
-        if (carts.Count == 0)
+        if (CurrentUser is null)
         {
-            var created = await _apiClient.CreateCartAsync();
-            carts = [created.Cart];
+            Carts.Clear();
+            CartItems.Clear();
+            SelectedCart = null;
+            OnPropertyChanged(nameof(CartCount));
+            return;
         }
+
+        var records = await _localStore.GetActiveCartRecordsAsync(CurrentUser.Id.ToString(CultureInfo.InvariantCulture));
+        var carts = records.Select(x => CloneCart(x.Cart)).OrderByDescending(x => x.Id).ToList();
 
         Carts.Clear();
         foreach (var cart in carts)
@@ -587,42 +890,503 @@ public partial class MainWindowViewModel : ViewModelBase
 
         OnPropertyChanged(nameof(CartCount));
 
-        var selectedId = preferredCartId ?? SelectedCart?.Id;
-        SelectedCart = carts.FirstOrDefault(c => c.Id == selectedId) ?? carts.First();
+        if (carts.Count == 0)
+        {
+            SelectedCart = null;
+            CartItems.Clear();
+            return;
+        }
+
+        var targetId = preferredCartId ?? SelectedCart?.Id;
+        SelectedCart = carts.FirstOrDefault(x => x.Id == targetId) ?? carts.First();
     }
 
-    private async Task AddItemToCurrentCartAsync(AddCartItemRequest request)
+    private async Task EnsureActiveCartAsync()
     {
-        if (SelectedCart is null)
+        if (CurrentUser is null)
         {
-            await RefreshCartsAsync();
+            return;
         }
+
+        await LoadCartsFromLocalAsync(SelectedCart?.Id);
+        if (SelectedCart is not null)
+        {
+            return;
+        }
+
+        await CreateAndSelectNewLocalCartAsync();
+    }
+
+    private async Task CreateAndSelectNewLocalCartAsync()
+    {
+        if (CurrentUser is null)
+        {
+            throw new InvalidOperationException("Требуется авторизация");
+        }
+
+        var userId = CurrentUser.Id.ToString(CultureInfo.InvariantCulture);
+        var record = await _localStore.CreateLocalCartAsync(userId);
+        var cart = CloneCart(record.Cart);
+
+        Carts.Insert(0, cart);
+        OnPropertyChanged(nameof(CartCount));
+        SelectedCart = cart;
+    }
+
+    private async Task AddItemToCurrentCartLocalAsync(AddCartItemRequest request)
+    {
+        await EnsureActiveCartAsync();
 
         if (SelectedCart is null)
         {
             throw new InvalidOperationException("Корзина не найдена");
         }
 
-        var response = await _apiClient.AddItemToCartAsync(SelectedCart.Id, request);
-        UpsertCart(response.Cart);
-        SelectedCart = response.Cart;
+        var product = await FindProductForAddAsync(request);
+        if (product is null)
+        {
+            throw new InvalidOperationException("Товар не найден в локальном кэше. Обновите каталог онлайн.");
+        }
+
+        var quantity = request.Quantity <= 0 ? 1 : request.Quantity;
+        var cart = CloneCart(SelectedCart);
+
+        var item = cart.Items.FirstOrDefault(x => x.ProductId == product.Id);
+        if (item is null)
+        {
+            var nextItemId = cart.Items.Count == 0
+                ? 1
+                : cart.Items.Max(x => x.Id) + 1;
+
+            item = new CartItemDto
+            {
+                Id = nextItemId,
+                ProductId = product.Id,
+                ProductName = product.Name,
+                ProductSku = product.Sku,
+                Price = product.SellingPrice,
+                Quantity = quantity,
+                Discount = 0,
+                LineSubtotal = Round2(product.SellingPrice * quantity),
+            };
+
+            cart.Items.Add(item);
+        }
+        else
+        {
+            item.Quantity += quantity;
+            item.LineSubtotal = Round2(item.Price * item.Quantity);
+        }
+
+        RecalculateCart(cart);
+        await SaveActiveCartAsync(cart, isDirty: true);
     }
 
-    private void UpsertCart(CartDto updated)
+    private async Task<ProductDto?> FindProductForAddAsync(AddCartItemRequest request)
     {
-        var existing = Carts.FirstOrDefault(c => c.Id == updated.Id);
+        if (request.ProductId.HasValue)
+        {
+            var existing = Products.FirstOrDefault(x => x.Id == request.ProductId.Value);
+            if (existing is not null)
+            {
+                return existing;
+            }
+
+            var all = await _localStore.LoadProductsAsync();
+            return all.FirstOrDefault(x => x.Id == request.ProductId.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Sku))
+        {
+            var existing = Products.FirstOrDefault(x => string.Equals(x.Sku, request.Sku, StringComparison.OrdinalIgnoreCase));
+            if (existing is not null)
+            {
+                return existing;
+            }
+
+            var all = await _localStore.LoadProductsAsync();
+            return all.FirstOrDefault(x => string.Equals(x.Sku, request.Sku, StringComparison.OrdinalIgnoreCase));
+        }
+
+        return null;
+    }
+
+    private async Task SaveActiveCartAsync(CartDto cart, bool isDirty)
+    {
+        if (CurrentUser is null)
+        {
+            return;
+        }
+
+        var userId = CurrentUser.Id.ToString(CultureInfo.InvariantCulture);
+        var existing = await _localStore.GetCartRecordAsync(userId, cart.Id);
+
+        var record = existing ?? new LocalCartRecord
+        {
+            ClientId = cart.Id,
+            UserId = userId,
+            ServerId = null,
+            State = LocalCartStates.Active,
+        };
+
+        record.Cart = CloneCart(cart);
+        record.State = LocalCartStates.Active;
+        record.IsDirty = isDirty;
+        record.PendingCheckout = null;
+
+        await _localStore.SaveCartRecordAsync(record);
+
+        UpsertCartInCollection(record.Cart);
+    }
+
+    private void UpsertCartInCollection(CartDto cart)
+    {
+        var clone = CloneCart(cart);
+        var existing = Carts.FirstOrDefault(x => x.Id == clone.Id);
         if (existing is null)
         {
-            Carts.Insert(0, updated);
+            Carts.Insert(0, clone);
             OnPropertyChanged(nameof(CartCount));
+            SelectedCart = clone;
             return;
         }
 
         var index = Carts.IndexOf(existing);
-        Carts[index] = updated;
+        Carts[index] = clone;
+
+        if (SelectedCart?.Id == clone.Id)
+        {
+            SelectedCart = clone;
+        }
     }
 
-    private async Task ExecuteBusyAsync(Func<Task> action, bool silentError = false)
+    private void RemoveCartFromCollection(int cartId)
+    {
+        var existing = Carts.FirstOrDefault(x => x.Id == cartId);
+        if (existing is null)
+        {
+            return;
+        }
+
+        Carts.Remove(existing);
+        OnPropertyChanged(nameof(CartCount));
+
+        if (SelectedCart?.Id == cartId)
+        {
+            SelectedCart = Carts.FirstOrDefault();
+        }
+    }
+
+    private async Task RemoveAndRecreateWorkingCartAsync(int currentCartId)
+    {
+        RemoveCartFromCollection(currentCartId);
+
+        if (CurrentUser is null)
+        {
+            return;
+        }
+
+        var active = await _localStore.GetActiveCartRecordsAsync(CurrentUser.Id.ToString(CultureInfo.InvariantCulture));
+        if (active.Count > 0)
+        {
+            await LoadCartsFromLocalAsync();
+            if (SelectedCart is null)
+            {
+                SelectedCart = Carts.FirstOrDefault();
+            }
+
+            return;
+        }
+
+        await CreateAndSelectNewLocalCartAsync();
+    }
+
+    private async Task DecreaseLocalProductStockAsync(IReadOnlyCollection<CartItemDto> items)
+    {
+        if (items.Count == 0)
+        {
+            return;
+        }
+
+        var products = await _localStore.LoadProductsAsync();
+        if (products.Count == 0)
+        {
+            return;
+        }
+
+        var changed = false;
+
+        foreach (var item in items)
+        {
+            var product = products.FirstOrDefault(x => x.Id == item.ProductId);
+            if (product is null)
+            {
+                continue;
+            }
+
+            var currentQty = ParseDecimal(product.QuantityRaw);
+            var nextQty = currentQty - item.Quantity;
+            product.QuantityRaw = nextQty.ToString(CultureInfo.InvariantCulture);
+            changed = true;
+        }
+
+        if (!changed)
+        {
+            return;
+        }
+
+        await _localStore.SaveProductsAsync(products);
+        await LoadProductsFromLocalAsync();
+    }
+
+    private async Task TrySyncNowAsync(bool forcePullFromServer, bool silent)
+    {
+        if (CurrentUser is null || string.IsNullOrWhiteSpace(_accessToken))
+        {
+            return;
+        }
+
+        if (!await _syncGate.WaitAsync(0))
+        {
+            return;
+        }
+
+        try
+        {
+            var userId = CurrentUser.Id.ToString(CultureInfo.InvariantCulture);
+
+            var me = await _apiClient.MeAsync();
+            CurrentUser = me.User;
+            await _localStore.SaveCachedUserAsync(me.User);
+
+            SetOfflineMode(false);
+
+            var pendingShiftOpen = await _localStore.GetPendingShiftOpenAsync();
+            if (pendingShiftOpen.HasValue)
+            {
+                var openResponse = await _apiClient.OpenShiftAsync(pendingShiftOpen.Value);
+                CurrentShift = openResponse.Shift;
+                await _localStore.SaveShiftAsync(openResponse.Shift);
+                await _localStore.ClearPendingShiftOpenAsync();
+            }
+
+            await SyncCartsAsync(userId);
+
+            var pendingShiftClose = await _localStore.GetPendingShiftCloseAsync();
+            if (pendingShiftClose.HasValue)
+            {
+                var closeResponse = await _apiClient.CloseShiftAsync(pendingShiftClose.Value);
+                CurrentShift = closeResponse.Shift;
+                await _localStore.SaveShiftAsync(closeResponse.Shift);
+                await _localStore.ClearPendingShiftCloseAsync();
+                await _localStore.ClearPendingShiftOpenAsync();
+                await _localStore.ClearUserCartsAsync(userId);
+            }
+
+            var shiftResponse = await _apiClient.GetCurrentShiftAsync();
+            CurrentShift = shiftResponse.Shift;
+            await _localStore.SaveShiftAsync(shiftResponse.Shift);
+
+            if (forcePullFromServer || ProductCount == 0)
+            {
+                var productsResponse = await _apiClient.GetProductsAsync(null);
+                await _localStore.SaveProductsAsync(productsResponse.Items);
+            }
+
+            var cartsResponse = await _apiClient.GetCartsAsync();
+            await _localStore.MergeServerCartsAsync(userId, cartsResponse.Items);
+
+            var activeLocalCarts = await _localStore.GetActiveCartRecordsAsync(userId);
+            if (CurrentShift is not null && CurrentShift.Status == "open" && activeLocalCarts.Count == 0)
+            {
+                var created = await _apiClient.CreateCartAsync();
+                await _localStore.MergeServerCartsAsync(userId, [created.Cart]);
+            }
+
+            await LoadProductsFromLocalAsync();
+            await LoadCartsFromLocalAsync(SelectedCart?.Id);
+
+            if (!silent)
+            {
+                StatusMessage = "Синхронизация завершена";
+            }
+        }
+        catch (ApiException ex)
+        {
+            if (ex.StatusCode == 401)
+            {
+                await ClearSessionAsync();
+                return;
+            }
+
+            if (!silent)
+            {
+                ErrorMessage = ex.Message;
+            }
+        }
+        catch (Exception ex) when (IsConnectivityException(ex))
+        {
+            SetOfflineMode(true);
+
+            if (!silent)
+            {
+                StatusMessage = "Оффлайн режим. Данные будут синхронизированы автоматически";
+            }
+        }
+        finally
+        {
+            _syncGate.Release();
+        }
+    }
+
+    private async Task SyncCartsAsync(string userId)
+    {
+        var records = await _localStore.GetCartRecordsAsync(userId);
+        foreach (var record in records.OrderBy(x => x.UpdatedAtUtc))
+        {
+            if (record.State == LocalCartStates.Deleted)
+            {
+                if (record.ServerId.HasValue)
+                {
+                    try
+                    {
+                        await _apiClient.DeleteCartAsync(record.ServerId.Value);
+                    }
+                    catch (ApiException ex) when (ex.StatusCode == 404)
+                    {
+                        // Already deleted on server.
+                    }
+                }
+
+                await _localStore.DeleteCartPermanentlyAsync(userId, record.ClientId);
+                continue;
+            }
+
+            if (record.State == LocalCartStates.CheckoutPending)
+            {
+                var serverCartId = record.ServerId;
+
+                if (record.IsDirty || !serverCartId.HasValue)
+                {
+                    serverCartId = await PushCartSnapshotToServerAsync(record);
+                }
+
+                if (record.PendingCheckout is null)
+                {
+                    record.State = LocalCartStates.Active;
+                    record.IsDirty = false;
+                    await _localStore.SaveCartRecordAsync(record);
+                    continue;
+                }
+
+                await _apiClient.CheckoutAsync(serverCartId!.Value, record.PendingCheckout);
+                await _localStore.DeleteCartPermanentlyAsync(userId, record.ClientId);
+                continue;
+            }
+
+            if (record.State == LocalCartStates.Active && record.IsDirty)
+            {
+                await PushCartSnapshotToServerAsync(record);
+                record.State = LocalCartStates.Active;
+                record.IsDirty = false;
+                record.PendingCheckout = null;
+                await _localStore.SaveCartRecordAsync(record);
+            }
+        }
+    }
+
+    private async Task<int> PushCartSnapshotToServerAsync(LocalCartRecord record)
+    {
+        if (record.ServerId.HasValue)
+        {
+            try
+            {
+                await _apiClient.DeleteCartAsync(record.ServerId.Value);
+            }
+            catch (ApiException ex) when (ex.StatusCode == 404)
+            {
+                // Missing on server is acceptable.
+            }
+        }
+
+        var createResponse = await _apiClient.CreateCartAsync();
+        var serverCartId = createResponse.Cart.Id;
+
+        foreach (var item in record.Cart.Items)
+        {
+            if (item.Quantity <= 0)
+            {
+                continue;
+            }
+
+            await _apiClient.AddItemToCartAsync(serverCartId, new AddCartItemRequest
+            {
+                ProductId = item.ProductId,
+                Sku = item.ProductSku,
+                Quantity = item.Quantity,
+            });
+        }
+
+        if (record.Cart.Discount > 0)
+        {
+            await _apiClient.ApplyDiscountAsync(serverCartId, new ApplyDiscountRequest
+            {
+                Type = "fixed",
+                Value = record.Cart.Discount,
+            });
+        }
+
+        record.ServerId = serverCartId;
+        return serverCartId;
+    }
+
+    private ShiftDto BuildLocalOpenShift(decimal initialCash)
+    {
+        return new ShiftDto
+        {
+            Id = CurrentShift?.Id ?? 0,
+            Status = "open",
+            InitialCash = initialCash,
+            StartTime = DateTime.UtcNow.ToString("O"),
+            UserId = CurrentUser?.Id,
+        };
+    }
+
+    private ShiftDto BuildLocalCloseShift(decimal finalCash)
+    {
+        return new ShiftDto
+        {
+            Id = CurrentShift?.Id ?? 0,
+            Status = "closed",
+            InitialCash = CurrentShift?.InitialCash ?? 0,
+            FinalCash = finalCash,
+            StartTime = CurrentShift?.StartTime,
+            EndTime = DateTime.UtcNow.ToString("O"),
+            UserId = CurrentUser?.Id,
+            SubTotal = CurrentShift?.SubTotal,
+            Total = CurrentShift?.Total,
+            Discounts = CurrentShift?.Discounts,
+            Debts = CurrentShift?.Debts,
+            Expence = CurrentShift?.Expence,
+        };
+    }
+
+    private void RecalculateCart(CartDto cart)
+    {
+        foreach (var item in cart.Items)
+        {
+            item.LineSubtotal = Round2(item.Price * item.Quantity);
+        }
+
+        var subtotalRaw = cart.Items.Sum(x => x.Price * x.Quantity);
+        var itemDiscount = cart.Items.Sum(x => x.Discount);
+        var totalDiscount = Math.Max(0, cart.Discount + itemDiscount);
+
+        cart.Subtotal = Round2(subtotalRaw);
+        cart.Total = Round2(Math.Max(0, subtotalRaw - totalDiscount));
+    }
+
+    private async Task ExecuteBusyAsync(Func<Task> action, bool clearMessages = true)
     {
         if (IsBusy)
         {
@@ -632,7 +1396,8 @@ public partial class MainWindowViewModel : ViewModelBase
         try
         {
             IsBusy = true;
-            if (!silentError)
+
+            if (clearMessages)
             {
                 ErrorMessage = string.Empty;
                 StatusMessage = string.Empty;
@@ -642,22 +1407,22 @@ public partial class MainWindowViewModel : ViewModelBase
         }
         catch (ApiException ex)
         {
-            if (!silentError)
-            {
-                ErrorMessage = ex.Message;
-            }
-
             if (ex.StatusCode == 401)
             {
-                ClearSession();
+                await ClearSessionAsync();
+                return;
             }
+
+            ErrorMessage = ex.Message;
+        }
+        catch (Exception ex) when (IsConnectivityException(ex))
+        {
+            SetOfflineMode(true);
+            ErrorMessage = "Соединение потеряно. Работа продолжается в офлайн режиме.";
         }
         catch (Exception ex)
         {
-            if (!silentError)
-            {
-                ErrorMessage = ex.Message;
-            }
+            ErrorMessage = ex.Message;
         }
         finally
         {
@@ -665,20 +1430,65 @@ public partial class MainWindowViewModel : ViewModelBase
         }
     }
 
-    private void ClearSession()
+    private void SetOfflineMode(bool isOffline)
+    {
+        IsOfflineMode = isOffline;
+    }
+
+    private async Task ClearSessionAsync()
     {
         SessionStore.Clear();
+
         _accessToken = null;
         _apiClient.ClearBearerToken();
+
         CurrentUser = null;
         CurrentShift = null;
         CurrentScreen = AppScreen.Login;
+        IsOfflineMode = false;
+
         Carts.Clear();
         Products.Clear();
         CartItems.Clear();
         SelectedCart = null;
+
         OnPropertyChanged(nameof(CartCount));
         OnPropertyChanged(nameof(ProductCount));
+
+        await _localStore.ClearAllAsync();
+    }
+
+    private static bool IsConnectivityException(Exception ex)
+    {
+        return ex is HttpRequestException || ex is TaskCanceledException;
+    }
+
+    private static CartDto CloneCart(CartDto source)
+    {
+        return new CartDto
+        {
+            Id = source.Id,
+            UserId = source.UserId,
+            Discount = source.Discount,
+            Subtotal = source.Subtotal,
+            Total = source.Total,
+            Items = source.Items.Select(CloneCartItem).ToList(),
+        };
+    }
+
+    private static CartItemDto CloneCartItem(CartItemDto source)
+    {
+        return new CartItemDto
+        {
+            Id = source.Id,
+            ProductId = source.ProductId,
+            ProductName = source.ProductName,
+            ProductSku = source.ProductSku,
+            Price = source.Price,
+            Quantity = source.Quantity,
+            Discount = source.Discount,
+            LineSubtotal = source.LineSubtotal,
+        };
     }
 
     private static decimal ParseMoney(string? raw)
@@ -700,5 +1510,23 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         throw new InvalidOperationException($"Неверный формат суммы: {raw}");
+    }
+
+    private static decimal ParseDecimal(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return 0;
+        }
+
+        var normalized = raw.Trim().Replace(',', '.');
+        return decimal.TryParse(normalized, NumberStyles.Any, CultureInfo.InvariantCulture, out var value)
+            ? value
+            : 0;
+    }
+
+    private static decimal Round2(decimal value)
+    {
+        return Math.Round(value, 2, MidpointRounding.AwayFromZero);
     }
 }
