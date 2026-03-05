@@ -38,6 +38,18 @@
                         <TextBlock Text="Оффлайн режим: вход возможен только по уже сохраненной сессии"
                                    Foreground="#92400E" />
                     </Border>
+                    <Border IsVisible="{Binding HasErrorMessage}"
+                            CornerRadius="10"
+                            Padding="10,6"
+                            Background="#FFE4E6">
+                        <TextBlock Text="{Binding ErrorMessage}" Foreground="#BE123C" />
+                    </Border>
+                    <Border IsVisible="{Binding HasStatusMessage}"
+                            CornerRadius="10"
+                            Padding="10,6"
+                            Background="#DCFCE7">
+                        <TextBlock Text="{Binding StatusMessage}" Foreground="#166534" />
+                    </Border>
                     <TextBlock Text="Вход в систему"
                                FontWeight="SemiBold"
                                FontSize="30"
@@ -66,6 +78,7 @@
                             Background="#10B981"
                             Foreground="White"
                             FontWeight="SemiBold"
+                            HorizontalAlignment="Stretch"
                             Command="{Binding LoginCommand}" />
 
                     <TextBlock Text="{Binding ApiBaseUrl, StringFormat=API: {0}}"
@@ -92,6 +105,18 @@
                             Margin="0,0,0,6">
                         <TextBlock Text="Оффлайн режим: открытие/закрытие смены синхронизируется автоматически"
                                    Foreground="#92400E" />
+                    </Border>
+                    <Border IsVisible="{Binding HasErrorMessage}"
+                            CornerRadius="10"
+                            Padding="10,6"
+                            Background="#FFE4E6">
+                        <TextBlock Text="{Binding ErrorMessage}" Foreground="#BE123C" />
+                    </Border>
+                    <Border IsVisible="{Binding HasStatusMessage}"
+                            CornerRadius="10"
+                            Padding="10,6"
+                            Background="#DCFCE7">
+                        <TextBlock Text="{Binding StatusMessage}" Foreground="#166534" />
                     </Border>
                     <TextBlock Text="Создание смены"
                                FontWeight="SemiBold"

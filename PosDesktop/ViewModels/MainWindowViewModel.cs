@@ -253,11 +253,13 @@ public partial class MainWindowViewModel : ViewModelBase
 
             Password = string.Empty;
 
-            await TrySyncNowAsync(forcePullFromServer: true, silent: true);
-            await LoadLocalShiftAsync();
+            var gotShiftFromServer = await TryFetchAndCacheCurrentShiftAsync();
             await RouteByShiftStateAsync();
+            _ = TrySyncNowAsync(forcePullFromServer: true, silent: true);
 
-            StatusMessage = "Успешный вход";
+            StatusMessage = gotShiftFromServer
+                ? "Успешный вход"
+                : "Вход выполнен. Оффлайн режим";
         });
     }
 
@@ -804,10 +806,13 @@ public partial class MainWindowViewModel : ViewModelBase
             await _localStore.SaveCachedUserAsync(me.User);
             SetOfflineMode(false);
 
-            await TrySyncNowAsync(forcePullFromServer: true, silent: true);
+            var gotShiftFromServer = await TryFetchAndCacheCurrentShiftAsync();
             await RouteByShiftStateAsync();
+            _ = TrySyncNowAsync(forcePullFromServer: true, silent: true);
 
-            StatusMessage = "Сессия восстановлена";
+            StatusMessage = gotShiftFromServer
+                ? "Сессия восстановлена"
+                : "Сессия восстановлена. Оффлайн режим";
         }
         catch (ApiException ex) when (ex.StatusCode == 401)
         {
@@ -853,6 +858,23 @@ public partial class MainWindowViewModel : ViewModelBase
     private async Task LoadLocalShiftAsync()
     {
         CurrentShift = await _localStore.LoadShiftAsync();
+    }
+
+    private async Task<bool> TryFetchAndCacheCurrentShiftAsync()
+    {
+        try
+        {
+            var shiftResponse = await _apiClient.GetCurrentShiftAsync();
+            CurrentShift = shiftResponse.Shift;
+            await _localStore.SaveShiftAsync(shiftResponse.Shift);
+            SetOfflineMode(false);
+            return true;
+        }
+        catch (Exception ex) when (IsConnectivityException(ex))
+        {
+            SetOfflineMode(true);
+            return false;
+        }
     }
 
     private async Task LoadProductsFromLocalAsync()
