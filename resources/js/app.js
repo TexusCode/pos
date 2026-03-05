@@ -1,97 +1,38 @@
-import './bootstrap';
+const LEGACY_CACHE_PREFIXES = ['pos-static-', 'pos-runtime-'];
+const CLEANUP_FLAG_KEY = 'pos_offline_cleanup_v1';
 
-const swUrlMeta = document.querySelector('meta[name="pos-sw-url"]');
-const swScopeMeta = document.querySelector('meta[name="pos-sw-scope"]');
-const pwaEnabledMeta = document.querySelector('meta[name="pos-pwa-enabled"]');
-const swUrl = swUrlMeta?.content || '/sw.js';
-const swScope = swScopeMeta?.content || '/';
-const pwaEnabled = pwaEnabledMeta?.content === '1';
-const normalizePath = (url) => {
+const cleanupLegacyOfflineArtifacts = async () => {
     try {
-        const parsed = new URL(url, window.location.origin);
-        const pathname = parsed.pathname.replace(/\/+$/, '');
-        return pathname === '' ? '/' : pathname;
-    } catch {
-        return '';
-    }
-};
-
-const syncOfflineIndicator = () => {
-    const indicator = document.getElementById('offline-indicator');
-
-    if (!indicator) {
-        return;
-    }
-
-    const hideIndicator = () => {
-        indicator.style.display = 'none';
-        indicator.setAttribute('hidden', 'hidden');
-    };
-
-    const showIndicator = () => {
-        indicator.style.display = 'block';
-        indicator.removeAttribute('hidden');
-    };
-
-    if (!pwaEnabled) {
-        hideIndicator();
-        return;
-    }
-
-    if (navigator.onLine) {
-        hideIndicator();
-    } else {
-        showIndicator();
-    }
-};
-
-window.addEventListener('online', syncOfflineIndicator);
-window.addEventListener('offline', syncOfflineIndicator);
-window.addEventListener('load', syncOfflineIndicator);
-
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', async () => {
-        try {
-            const registrations = await navigator.serviceWorker.getRegistrations();
-            const expectedScope = normalizePath(swScope);
-            const expectedScript = normalizePath(swUrl);
-
-            await Promise.all(
-                registrations.map(async (registration) => {
-                    const scriptUrl =
-                        registration.active?.scriptURL ||
-                        registration.waiting?.scriptURL ||
-                        registration.installing?.scriptURL ||
-                        '';
-
-                    const registrationScope = normalizePath(registration.scope);
-                    const registrationScript = normalizePath(scriptUrl);
-                    const scopeMatches = registrationScope === expectedScope;
-                    const scriptMatches = registrationScript === expectedScript;
-
-                    if (!pwaEnabled || !scopeMatches || !scriptMatches) {
-                        await registration.unregister();
-                    }
-                }),
-            );
-        } catch (error) {
-            console.error('Service worker cleanup failed:', error);
-        }
-
-        if (!pwaEnabled) {
+        if (window.localStorage?.getItem(CLEANUP_FLAG_KEY) === '1') {
             return;
         }
+    } catch {
+        // Ignore storage access issues and continue cleanup.
+    }
 
-        try {
-            const registration = await navigator.serviceWorker.register(swUrl, {
-                scope: swScope,
-            });
-
-            if (registration.waiting) {
-                registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-            }
-        } catch (error) {
-            console.error('Service worker registration failed:', error);
+    try {
+        if ('serviceWorker' in navigator) {
+            const registrations = await navigator.serviceWorker.getRegistrations();
+            await Promise.all(registrations.map((registration) => registration.unregister()));
         }
-    });
-}
+
+        if ('caches' in window) {
+            const cacheNames = await caches.keys();
+            const legacyCacheNames = cacheNames.filter((name) =>
+                LEGACY_CACHE_PREFIXES.some((prefix) => name.startsWith(prefix)),
+            );
+
+            await Promise.all(legacyCacheNames.map((name) => caches.delete(name)));
+        }
+    } catch (error) {
+        console.error('Legacy offline cleanup failed:', error);
+    } finally {
+        try {
+            window.localStorage?.setItem(CLEANUP_FLAG_KEY, '1');
+        } catch {
+            // Ignore storage access issues.
+        }
+    }
+};
+
+window.addEventListener('load', cleanupLegacyOfflineArtifacts, { once: true });

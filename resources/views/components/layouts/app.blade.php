@@ -7,7 +7,6 @@
         $manifest = file_exists($manifestPath) ? json_decode(file_get_contents($manifestPath), true) : null;
         $builtCss = $manifest['resources/css/app.css']['file'] ?? null;
         $builtJs = $manifest['resources/js/app.js']['file'] ?? null;
-        $requestBasePath = rtrim(request()->getBaseUrl(), '/');
 
         $assetPrefix = '/build';
         if ($builtCss) {
@@ -25,20 +24,12 @@
         }
 
         $fallbackAssetPrefix = $assetPrefix === '/build' ? '/public/build' : '/build';
-        $manifestUrl = $requestBasePath . '/manifest.webmanifest';
-        $swUrl = $requestBasePath . '/sw.js';
-        $swScope = $requestBasePath === '' ? '/' : $requestBasePath . '/';
-        $pwaEnabled = true;
     @endphp
 
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#10b981">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <meta name="pos-sw-url" content="{{ $swUrl }}">
-    <meta name="pos-sw-scope" content="{{ $swScope }}">
-    <meta name="pos-pwa-enabled" content="{{ $pwaEnabled ? '1' : '0' }}">
-    <link rel="manifest" href="{{ $manifestUrl }}">
 
     <title>{{ $title ?? 'Page Title' }}</title>
     @if ($builtCss)
@@ -51,35 +42,12 @@
 </head>
 
 <body>
-    <div id="offline-indicator"
-        class="pointer-events-none fixed bottom-3 right-3 z-[100] rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800"
-        style="display:none;" hidden>
-        Оффлайн режим: часть действий недоступна до восстановления сети
-    </div>
     @livewire('loading')
     {{ $slot }}
     @fluxScripts
     @if ($builtJs)
-        <script type="module">
-            (function() {
-                const primarySrc = @json($assetPrefix . '/' . $builtJs);
-                const fallbackSrc = @json($fallbackAssetPrefix . '/' . $builtJs);
-
-                const loadModule = (src, withFallback = false) => {
-                    const script = document.createElement('script');
-                    script.type = 'module';
-                    script.src = src;
-                    script.setAttribute('data-navigate-track', 'reload');
-
-                    if (withFallback) {
-                        script.onerror = () => loadModule(fallbackSrc, false);
-                    }
-
-                    document.head.appendChild(script);
-                };
-
-                loadModule(primarySrc, primarySrc !== fallbackSrc);
-            })();
+        <script type="module" src="{{ $assetPrefix . '/' . $builtJs }}" data-navigate-track="reload"
+            onerror="if(this.src.indexOf('{{ $fallbackAssetPrefix }}/{{ $builtJs }}')===-1){this.src='{{ $fallbackAssetPrefix . '/' . $builtJs }}';}">
         </script>
     @elseif (file_exists(public_path('hot')))
         @vite('resources/js/app.js')
