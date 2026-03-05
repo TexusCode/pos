@@ -582,6 +582,17 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    private async Task ConfirmCloseShiftAsync()
+    {
+        if (!IsCloseShiftDialogOpen)
+        {
+            return;
+        }
+
+        await CloseShiftAsync();
+    }
+
+    [RelayCommand]
     private async Task RefreshProductsAsync()
     {
         await ExecuteBusyAsync(async () =>

@@ -21,12 +21,7 @@ public sealed class LocalPosStore
 
     public LocalPosStore()
     {
-        var basePath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "TexHubPosDesktop");
-
-        Directory.CreateDirectory(basePath);
-        _dbPath = Path.Combine(basePath, "local-pos.db");
+        _dbPath = AppDataPaths.GetDatabasePath();
     }
 
     public async Task InitializeAsync()

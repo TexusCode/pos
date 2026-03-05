@@ -4,10 +4,7 @@ namespace PosDesktop.Services;
 
 public static class SessionStore
 {
-    private static readonly string SessionPath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "TexHubPosDesktop",
-        "session.json");
+    private static readonly string SessionPath = AppDataPaths.GetSessionPath();
 
     public static string? LoadToken()
     {

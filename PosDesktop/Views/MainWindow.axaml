@@ -23,6 +23,8 @@
     <Window.KeyBindings>
         <KeyBinding Gesture="Meta+Shift+S" Command="{Binding ToggleCloseShiftDialogCommand}" />
         <KeyBinding Gesture="Control+Shift+S" Command="{Binding ToggleCloseShiftDialogCommand}" />
+        <KeyBinding Gesture="Meta+Shift+W" Command="{Binding ConfirmCloseShiftCommand}" />
+        <KeyBinding Gesture="Control+Shift+W" Command="{Binding ConfirmCloseShiftCommand}" />
 
         <KeyBinding Gesture="Meta+R" Command="{Binding RefreshAllCommand}" />
         <KeyBinding Gesture="Control+R" Command="{Binding RefreshAllCommand}" />
@@ -868,19 +870,26 @@
                         BorderThickness="1"
                         CornerRadius="18"
                         Padding="16">
-                    <StackPanel Spacing="10">
+                    <StackPanel Spacing="10"
+                                HorizontalAlignment="Stretch">
                         <TextBlock Text="Закрыть смену" FontSize="22" FontWeight="SemiBold" />
-                        <TextBox Text="{Binding FinalCashInput}" Watermark="Наличными в кассе" />
-                        <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                        <TextBox Text="{Binding FinalCashInput}"
+                                 Watermark="Наличными в кассе"
+                                 HorizontalAlignment="Stretch" />
+                        <Grid ColumnDefinitions="*,*"
+                              ColumnSpacing="8"
+                              HorizontalAlignment="Stretch">
                             <Button Grid.Column="0"
-                                    Content="Закрыть смену"
+                                    Content="Закрыть смену (ctrl+shift+w)"
                                     Background="#10B981"
                                     Foreground="White"
-                                    Command="{Binding CloseShiftCommand}" />
+                                    HorizontalAlignment="Stretch"
+                                    Command="{Binding ConfirmCloseShiftCommand}" />
                             <Button Grid.Column="1"
-                                    Content="Отмена"
+                                    Content="Отмена (esc)"
                                     Background="#E2E8F0"
                                     Foreground="#0F172A"
+                                    HorizontalAlignment="Stretch"
                                     Command="{Binding ToggleCloseShiftDialogCommand}" />
                         </Grid>
                     </StackPanel>
