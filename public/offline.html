@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#10b981">
+    <title>TexHub POS - Оффлайн</title>
+    <style>
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Instrument Sans", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+            display: grid;
+            place-items: center;
+            background:
+                radial-gradient(circle at 12% 12%, rgba(16, 185, 129, 0.2), transparent 42%),
+                radial-gradient(circle at 88% 14%, rgba(14, 165, 233, 0.16), transparent 40%),
+                linear-gradient(180deg, #f8fafc 0%, #eff6ff 100%);
+            color: #0f172a;
+        }
+
+        .card {
+            width: min(92vw, 460px);
+            background: rgba(255, 255, 255, 0.94);
+            border: 1px solid rgba(148, 163, 184, 0.4);
+            border-radius: 18px;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        h1 {
+            margin: 0 0 8px;
+            font-size: 1.2rem;
+        }
+
+        p {
+            margin: 0;
+            line-height: 1.5;
+            color: #334155;
+        }
+
+        .small {
+            margin-top: 10px;
+            color: #64748b;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <main class="card">
+        <h1>Нет интернета</h1>
+        <p>Страница открыта из локального кеша. Когда интернет появится, обновите страницу, чтобы синхронизироваться с сервером.</p>
+        <p class="small">TexHub POS Offline</p>
+    </main>
+</body>
+</html>

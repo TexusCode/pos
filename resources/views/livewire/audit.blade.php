@@ -9,7 +9,7 @@
     font-size: 16px;
     line-height: 1.2;
     outline: none;                /* убирает стандартный outline */
-    transition: box-shadow 0.15s ease, border-width 0.12s ease;
+    transition: border-width 0.12s ease;
     box-sizing: border-box;
 }
 .label {

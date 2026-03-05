@@ -9,3 +9,75 @@
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
 }
+
+.pos-shell {
+    --pos-ink: #0f172a;
+    --pos-muted: #64748b;
+    --pos-surface: rgba(255, 255, 255, 0.84);
+    --pos-border: rgba(148, 163, 184, 0.32);
+    --pos-accent: #10b981;
+    --pos-accent-soft: rgba(16, 185, 129, 0.16);
+    background:
+        radial-gradient(circle at 12% 12%, rgba(16, 185, 129, 0.2), transparent 42%),
+        radial-gradient(circle at 88% 14%, rgba(14, 165, 233, 0.16), transparent 40%),
+        radial-gradient(circle at 74% 86%, rgba(250, 204, 21, 0.15), transparent 38%),
+        linear-gradient(180deg, #f8fafc 0%, #eff6ff 100%);
+}
+
+.pos-card {
+    background: var(--pos-surface);
+    border: 1px solid var(--pos-border);
+    backdrop-filter: blur(8px);
+    animation: pos-fade 0.45s ease both;
+}
+
+*,
+*::before,
+*::after {
+    box-shadow: none !important;
+    text-shadow: none !important;
+}
+
+.pos-grid > *:nth-child(2) {
+    animation-delay: 0.06s;
+}
+
+.pos-grid > *:nth-child(3) {
+    animation-delay: 0.12s;
+}
+
+.pos-glow {
+    animation: pos-drift 8s ease-in-out infinite;
+}
+
+@keyframes pos-fade {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes pos-drift {
+
+    0%,
+    100% {
+        transform: translateY(0px);
+    }
+
+    50% {
+        transform: translateY(8px);
+    }
+}
+
+.pos-shell button:not([aria-label]) {
+    text-align: left;
+}
+
+.pos-shell button.inline-flex:not([aria-label]) {
+    justify-content: flex-start;
+}
