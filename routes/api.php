@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CartController;
+use App\Http\Controllers\Api\PosActionController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ShiftController;
 use Illuminate\Support\Facades\Route;
@@ -21,6 +22,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/products/{product}', [ProductController::class, 'show'])
             ->whereNumber('product');
         Route::get('/products/by-sku/{sku}', [ProductController::class, 'bySku']);
+        Route::post('/products/stock', [PosActionController::class, 'upsertProductStock']);
 
         Route::get('/carts', [CartController::class, 'index']);
         Route::post('/carts', [CartController::class, 'store']);
@@ -39,5 +41,9 @@ Route::prefix('v1')->group(function () {
             ->whereNumber('cart');
         Route::post('/carts/{cart}/checkout', [CartController::class, 'checkout'])
             ->whereNumber('cart');
+
+        Route::post('/shift/expenses', [PosActionController::class, 'addExpense']);
+        Route::get('/customers/by-phone/{phone}', [PosActionController::class, 'findCustomerByPhone']);
+        Route::post('/debts/pay', [PosActionController::class, 'payDebt']);
     });
 });

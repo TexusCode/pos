@@ -79,6 +79,17 @@ public sealed class PosApiClient
             cancellationToken);
     }
 
+    public Task<ExpenseActionResponse> AddExpenseAsync(
+        AddExpenseRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        return SendAsync<ExpenseActionResponse>(
+            HttpMethod.Post,
+            $"{ApiPrefix}/shift/expenses",
+            request,
+            cancellationToken);
+    }
+
     public Task<ProductListResponse> GetProductsAsync(
         string? search,
         string? status = null,
@@ -120,6 +131,37 @@ public sealed class PosApiClient
             HttpMethod.Get,
             $"{ApiPrefix}/products/by-sku/{Uri.EscapeDataString(sku)}",
             null,
+            cancellationToken);
+    }
+
+    public Task<UpsertProductStockResponse> UpsertProductStockAsync(
+        UpsertProductStockRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        return SendAsync<UpsertProductStockResponse>(
+            HttpMethod.Post,
+            $"{ApiPrefix}/products/stock",
+            request,
+            cancellationToken);
+    }
+
+    public Task<CustomerLookupResponse> FindCustomerByPhoneAsync(string phone, CancellationToken cancellationToken = default)
+    {
+        return SendAsync<CustomerLookupResponse>(
+            HttpMethod.Get,
+            $"{ApiPrefix}/customers/by-phone/{Uri.EscapeDataString(phone)}",
+            null,
+            cancellationToken);
+    }
+
+    public Task<DebtPaymentResponse> PayDebtAsync(
+        PayDebtRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        return SendAsync<DebtPaymentResponse>(
+            HttpMethod.Post,
+            $"{ApiPrefix}/debts/pay",
+            request,
             cancellationToken);
     }
 

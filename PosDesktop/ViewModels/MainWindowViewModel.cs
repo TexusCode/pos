@@ -57,6 +57,7 @@ public partial class MainWindowViewModel : ViewModelBase
     public IReadOnlyList<string> PaymentMethods { get; } = ["Наличными", "Карта", "В долг"];
     public IReadOnlyList<string> DiscountTypes { get; } = ["fixed", "percent"];
     public IReadOnlyList<string> ItemDiscountTypes { get; } = ["fixed", "percent"];
+    public IReadOnlyList<string> ProductStatuses { get; } = ["active", "inactive", "draft"];
 
     [ObservableProperty]
     private AppScreen _currentScreen = AppScreen.Login;
@@ -142,12 +143,55 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty]
     private string _itemDiscountType = "fixed";
 
+    [ObservableProperty]
+    private bool _isAddExpenseDialogOpen;
+
+    [ObservableProperty]
+    private string _expenseTotalInput = string.Empty;
+
+    [ObservableProperty]
+    private string _expenseDescriptionInput = string.Empty;
+
+    [ObservableProperty]
+    private bool _isPayDebtDialogOpen;
+
+    [ObservableProperty]
+    private string _debtPhoneInput = string.Empty;
+
+    [ObservableProperty]
+    private string _debtTotalInput = string.Empty;
+
+    [ObservableProperty]
+    private string _debtCustomerNameInput = string.Empty;
+
+    [ObservableProperty]
+    private string _debtCustomerStatus = string.Empty;
+
+    [ObservableProperty]
+    private bool _isAddProductDialogOpen;
+
+    [ObservableProperty]
+    private string _newProductSkuInput = string.Empty;
+
+    [ObservableProperty]
+    private string _newProductQuantityInput = "1";
+
+    [ObservableProperty]
+    private string _newProductNameInput = string.Empty;
+
+    [ObservableProperty]
+    private string _newProductPriceInput = string.Empty;
+
+    [ObservableProperty]
+    private string _newProductStatus = "active";
+
     public bool IsLoginScreen => CurrentScreen == AppScreen.Login;
     public bool IsShiftScreen => CurrentScreen == AppScreen.Shift;
     public bool IsPosScreen => CurrentScreen == AppScreen.Pos;
     public bool IsDebtPayment => PaymentMethod == "В долг";
     public bool HasErrorMessage => !string.IsNullOrWhiteSpace(ErrorMessage);
     public bool HasStatusMessage => !string.IsNullOrWhiteSpace(StatusMessage);
+    public bool HasDebtCustomerStatus => !string.IsNullOrWhiteSpace(DebtCustomerStatus);
 
     public int CartCount => Carts.Count;
     public int ProductCount => Products.Count;
@@ -222,6 +266,11 @@ public partial class MainWindowViewModel : ViewModelBase
     partial void OnStatusMessageChanged(string value)
     {
         OnPropertyChanged(nameof(HasStatusMessage));
+    }
+
+    partial void OnDebtCustomerStatusChanged(string value)
+    {
+        OnPropertyChanged(nameof(HasDebtCustomerStatus));
     }
 
     partial void OnSearchTextChanged(string value)
@@ -543,6 +592,190 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    private void ToggleAddExpenseDialog()
+    {
+        IsAddExpenseDialogOpen = !IsAddExpenseDialogOpen;
+        if (!IsAddExpenseDialogOpen)
+        {
+            ResetAddExpenseForm();
+        }
+    }
+
+    [RelayCommand]
+    private async Task AddExpenseAsync()
+    {
+        if (!IsAddExpenseDialogOpen)
+        {
+            return;
+        }
+
+        await ExecuteBusyAsync(async () =>
+        {
+            EnsureOnlineActionAllowed();
+            EnsureOpenShift();
+
+            var total = ParseMoney(ExpenseTotalInput);
+            if (total <= 0)
+            {
+                throw new InvalidOperationException("Введите сумму расхода больше 0");
+            }
+
+            var response = await _apiClient.AddExpenseAsync(new AddExpenseRequest
+            {
+                Total = total,
+                Description = string.IsNullOrWhiteSpace(ExpenseDescriptionInput)
+                    ? null
+                    : ExpenseDescriptionInput.Trim(),
+            });
+
+            ToggleAddExpenseDialog();
+            _ = TrySyncNowAsync(forcePullFromServer: false, silent: true);
+            StatusMessage = string.IsNullOrWhiteSpace(response.Message)
+                ? "Расход добавлен"
+                : response.Message;
+        });
+    }
+
+    [RelayCommand]
+    private void TogglePayDebtDialog()
+    {
+        IsPayDebtDialogOpen = !IsPayDebtDialogOpen;
+        if (!IsPayDebtDialogOpen)
+        {
+            ResetPayDebtForm();
+        }
+    }
+
+    [RelayCommand]
+    private async Task FindDebtCustomerAsync()
+    {
+        if (!IsPayDebtDialogOpen)
+        {
+            return;
+        }
+
+        await ExecuteBusyAsync(async () =>
+        {
+            EnsureOnlineActionAllowed();
+
+            var phone = DebtPhoneInput.Trim();
+            if (string.IsNullOrWhiteSpace(phone))
+            {
+                throw new InvalidOperationException("Введите телефон клиента");
+            }
+
+            var response = await _apiClient.FindCustomerByPhoneAsync(phone);
+            if (response.Customer is null)
+            {
+                DebtCustomerStatus = "Клиент не найден. Будет создан при погашении.";
+                return;
+            }
+
+            DebtCustomerNameInput = response.Customer.Name;
+            DebtCustomerStatus = $"Текущий долг: {response.Customer.Debt:0.##} c";
+        });
+    }
+
+    [RelayCommand]
+    private async Task PayDebtAsync()
+    {
+        if (!IsPayDebtDialogOpen)
+        {
+            return;
+        }
+
+        await ExecuteBusyAsync(async () =>
+        {
+            EnsureOnlineActionAllowed();
+            EnsureOpenShift();
+
+            var phone = DebtPhoneInput.Trim();
+            if (string.IsNullOrWhiteSpace(phone))
+            {
+                throw new InvalidOperationException("Введите телефон клиента");
+            }
+
+            var total = ParseMoney(DebtTotalInput);
+            if (total <= 0)
+            {
+                throw new InvalidOperationException("Введите сумму погашения больше 0");
+            }
+
+            var response = await _apiClient.PayDebtAsync(new PayDebtRequest
+            {
+                Phone = phone,
+                Total = total,
+                CustomerName = string.IsNullOrWhiteSpace(DebtCustomerNameInput)
+                    ? null
+                    : DebtCustomerNameInput.Trim(),
+            });
+
+            TogglePayDebtDialog();
+            _ = TrySyncNowAsync(forcePullFromServer: false, silent: true);
+            StatusMessage = string.IsNullOrWhiteSpace(response.Message)
+                ? "Долг успешно погашен"
+                : $"{response.Message}. Остаток долга: {response.Customer.Debt:0.##} c";
+        });
+    }
+
+    [RelayCommand]
+    private void ToggleAddProductDialog()
+    {
+        IsAddProductDialogOpen = !IsAddProductDialogOpen;
+        if (!IsAddProductDialogOpen)
+        {
+            ResetAddProductForm();
+        }
+    }
+
+    [RelayCommand]
+    private async Task SaveProductAsync()
+    {
+        if (!IsAddProductDialogOpen)
+        {
+            return;
+        }
+
+        await ExecuteBusyAsync(async () =>
+        {
+            EnsureOnlineActionAllowed();
+            EnsureOpenShift();
+
+            var sku = NewProductSkuInput.Trim();
+            if (string.IsNullOrWhiteSpace(sku))
+            {
+                throw new InvalidOperationException("Введите артикул (SKU)");
+            }
+
+            var quantity = ParsePositiveInt(NewProductQuantityInput, "количество");
+            decimal? sellingPrice = null;
+            if (!string.IsNullOrWhiteSpace(NewProductPriceInput))
+            {
+                sellingPrice = ParseMoney(NewProductPriceInput);
+                if (sellingPrice < 0)
+                {
+                    throw new InvalidOperationException("Цена не может быть отрицательной");
+                }
+            }
+
+            var response = await _apiClient.UpsertProductStockAsync(new UpsertProductStockRequest
+            {
+                Sku = sku,
+                Quantity = quantity,
+                Name = string.IsNullOrWhiteSpace(NewProductNameInput)
+                    ? null
+                    : NewProductNameInput.Trim(),
+                SellingPrice = sellingPrice,
+                Status = string.IsNullOrWhiteSpace(NewProductStatus) ? "active" : NewProductStatus,
+            });
+
+            ToggleAddProductDialog();
+            await TrySyncNowAsync(forcePullFromServer: true, silent: true);
+            StatusMessage = response.Created ? "Товар создан и добавлен на склад" : "Остаток товара обновлен";
+        });
+    }
+
+    [RelayCommand]
     private async Task AddByBarcodeAsync()
     {
         await ExecuteBusyAsync(async () =>
@@ -819,6 +1052,24 @@ public partial class MainWindowViewModel : ViewModelBase
     [RelayCommand]
     private void CloseOpenDialog()
     {
+        if (IsAddProductDialogOpen)
+        {
+            ToggleAddProductDialog();
+            return;
+        }
+
+        if (IsPayDebtDialogOpen)
+        {
+            TogglePayDebtDialog();
+            return;
+        }
+
+        if (IsAddExpenseDialogOpen)
+        {
+            ToggleAddExpenseDialog();
+            return;
+        }
+
         if (IsItemDiscountDialogOpen)
         {
             ToggleItemDiscountDialog();
@@ -1693,6 +1944,50 @@ public partial class MainWindowViewModel : ViewModelBase
         };
     }
 
+    private void EnsureOnlineActionAllowed()
+    {
+        if (CurrentUser is null || string.IsNullOrWhiteSpace(_accessToken))
+        {
+            throw new InvalidOperationException("Требуется авторизация");
+        }
+
+        if (IsOfflineMode)
+        {
+            throw new InvalidOperationException("Это действие доступно только онлайн");
+        }
+    }
+
+    private void EnsureOpenShift()
+    {
+        if (CurrentShift is null || !string.Equals(CurrentShift.Status, "open", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Смена должна быть открыта");
+        }
+    }
+
+    private void ResetAddExpenseForm()
+    {
+        ExpenseTotalInput = string.Empty;
+        ExpenseDescriptionInput = string.Empty;
+    }
+
+    private void ResetPayDebtForm()
+    {
+        DebtPhoneInput = string.Empty;
+        DebtTotalInput = string.Empty;
+        DebtCustomerNameInput = string.Empty;
+        DebtCustomerStatus = string.Empty;
+    }
+
+    private void ResetAddProductForm()
+    {
+        NewProductSkuInput = string.Empty;
+        NewProductQuantityInput = "1";
+        NewProductNameInput = string.Empty;
+        NewProductPriceInput = string.Empty;
+        NewProductStatus = "active";
+    }
+
     private void RecalculateCart(CartDto cart)
     {
         foreach (var item in cart.Items)
@@ -1833,6 +2128,28 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         throw new InvalidOperationException($"Неверный формат суммы: {raw}");
+    }
+
+    private static int ParsePositiveInt(string? raw, string fieldLabel)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            throw new InvalidOperationException($"Введите {fieldLabel}");
+        }
+
+        var normalized = raw.Trim().Replace(" ", string.Empty);
+        if (!int.TryParse(normalized, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value)
+            && !int.TryParse(normalized, NumberStyles.Integer, CultureInfo.CurrentCulture, out value))
+        {
+            throw new InvalidOperationException($"Неверный формат поля '{fieldLabel}': {raw}");
+        }
+
+        if (value <= 0)
+        {
+            throw new InvalidOperationException($"Поле '{fieldLabel}' должно быть больше 0");
+        }
+
+        return value;
     }
 
     private static decimal ParseDecimal(string? raw)

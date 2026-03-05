@@ -30,6 +30,13 @@
         <KeyBinding Gesture="Meta+Shift+Q" Command="{Binding LogoutCommand}" />
         <KeyBinding Gesture="Control+Shift+Q" Command="{Binding LogoutCommand}" />
 
+        <KeyBinding Gesture="Meta+Shift+P" Command="{Binding TogglePayDebtDialogCommand}" />
+        <KeyBinding Gesture="Control+Shift+P" Command="{Binding TogglePayDebtDialogCommand}" />
+        <KeyBinding Gesture="Meta+Shift+A" Command="{Binding ToggleAddProductDialogCommand}" />
+        <KeyBinding Gesture="Control+Shift+A" Command="{Binding ToggleAddProductDialogCommand}" />
+        <KeyBinding Gesture="Meta+Shift+E" Command="{Binding ToggleAddExpenseDialogCommand}" />
+        <KeyBinding Gesture="Control+Shift+E" Command="{Binding ToggleAddExpenseDialogCommand}" />
+
         <KeyBinding Gesture="Meta+M" Command="{Binding ToggleDiscountDialogCommand}" />
         <KeyBinding Gesture="Control+M" Command="{Binding ToggleDiscountDialogCommand}" />
         <KeyBinding Gesture="Meta+Shift+M" Command="{Binding ApplyDiscountCommand}" />
@@ -170,6 +177,7 @@
                                 Height="44"
                                 Background="#10B981"
                                 Foreground="White"
+                                HorizontalAlignment="Stretch"
                                 FontWeight="SemiBold"
                                 Command="{Binding OpenShiftCommand}" />
                         <Button Grid.Column="1"
@@ -177,6 +185,7 @@
                                 Height="44"
                                 Background="#F43F5E"
                                 Foreground="White"
+                                HorizontalAlignment="Stretch"
                                 FontWeight="SemiBold"
                                 Command="{Binding LogoutCommand}" />
                     </Grid>
@@ -251,6 +260,60 @@
                                     <TextBlock Grid.Column="1"
                                                Margin="10,0,0,0"
                                                Text="Закрыть смену (ctrl+shift+s)"
+                                               VerticalAlignment="Center" />
+                                </Grid>
+                            </Button>
+
+                            <Button Background="#F59E0B"
+                                    Foreground="White"
+                                    Height="44"
+                                    HorizontalAlignment="Stretch"
+                                    HorizontalContentAlignment="Stretch"
+                                    Command="{Binding TogglePayDebtDialogCommand}">
+                                <Grid ColumnDefinitions="Auto,*">
+                                    <svg:Svg Path="/Assets/icons/solar/hand-money-linear.svg"
+                                             Width="18"
+                                             Height="18"
+                                             VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1"
+                                               Margin="10,0,0,0"
+                                               Text="Погасить долг (ctrl+shift+p)"
+                                               VerticalAlignment="Center" />
+                                </Grid>
+                            </Button>
+
+                            <Button Background="#06B6D4"
+                                    Foreground="White"
+                                    Height="44"
+                                    HorizontalAlignment="Stretch"
+                                    HorizontalContentAlignment="Stretch"
+                                    Command="{Binding ToggleAddProductDialogCommand}">
+                                <Grid ColumnDefinitions="Auto,*">
+                                    <svg:Svg Path="/Assets/icons/solar/box-linear.svg"
+                                             Width="18"
+                                             Height="18"
+                                             VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1"
+                                               Margin="10,0,0,0"
+                                               Text="Добавить товар (ctrl+shift+a)"
+                                               VerticalAlignment="Center" />
+                                </Grid>
+                            </Button>
+
+                            <Button Background="#F97316"
+                                    Foreground="White"
+                                    Height="44"
+                                    HorizontalAlignment="Stretch"
+                                    HorizontalContentAlignment="Stretch"
+                                    Command="{Binding ToggleAddExpenseDialogCommand}">
+                                <Grid ColumnDefinitions="Auto,*">
+                                    <svg:Svg Path="/Assets/icons/solar/bill-list-linear.svg"
+                                             Width="18"
+                                             Height="18"
+                                             VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1"
+                                               Margin="10,0,0,0"
+                                               Text="Добавить расход (ctrl+shift+e)"
                                                VerticalAlignment="Center" />
                                 </Grid>
                             </Button>
@@ -819,6 +882,151 @@
                                     Background="#E2E8F0"
                                     Foreground="#0F172A"
                                     Command="{Binding ToggleCloseShiftDialogCommand}" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
+
+        <Border IsVisible="{Binding IsPayDebtDialogOpen}"
+                Background="#880F172A">
+            <Grid HorizontalAlignment="Center" VerticalAlignment="Center" Width="500">
+                <Border Background="White"
+                        BorderBrush="#D8E0EA"
+                        BorderThickness="1"
+                        CornerRadius="18"
+                        Padding="16">
+                    <StackPanel Spacing="10"
+                                HorizontalAlignment="Stretch">
+                        <TextBlock Text="Погасить долг" FontSize="22" FontWeight="SemiBold" />
+                        <Grid ColumnDefinitions="*,Auto"
+                              ColumnSpacing="8"
+                              HorizontalAlignment="Stretch">
+                            <TextBox Grid.Column="0"
+                                     Text="{Binding DebtPhoneInput}"
+                                     Watermark="Телефон клиента"
+                                     HorizontalAlignment="Stretch" />
+                            <Button Grid.Column="1"
+                                    Content="Найти"
+                                    Background="#CBD5E1"
+                                    Foreground="#0F172A"
+                                    Command="{Binding FindDebtCustomerCommand}" />
+                        </Grid>
+                        <TextBox Text="{Binding DebtCustomerNameInput}"
+                                 Watermark="Имя клиента (необязательно)"
+                                 HorizontalAlignment="Stretch" />
+                        <TextBox Text="{Binding DebtTotalInput}"
+                                 Watermark="Сумма погашения"
+                                 HorizontalAlignment="Stretch" />
+                        <Border IsVisible="{Binding HasDebtCustomerStatus}"
+                                Background="#F1F5F9"
+                                CornerRadius="10"
+                                BorderBrush="#E2E8F0"
+                                BorderThickness="1"
+                                Padding="10,6">
+                            <TextBlock Text="{Binding DebtCustomerStatus}"
+                                       Foreground="#334155" />
+                        </Border>
+                        <Grid ColumnDefinitions="*,*"
+                              ColumnSpacing="8"
+                              HorizontalAlignment="Stretch">
+                            <Button Grid.Column="0"
+                                    Content="Погасить"
+                                    Background="#10B981"
+                                    Foreground="White"
+                                    HorizontalAlignment="Stretch"
+                                    Command="{Binding PayDebtCommand}" />
+                            <Button Grid.Column="1"
+                                    Content="Закрыть (esc)"
+                                    Background="#E2E8F0"
+                                    Foreground="#0F172A"
+                                    HorizontalAlignment="Stretch"
+                                    Command="{Binding TogglePayDebtDialogCommand}" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
+
+        <Border IsVisible="{Binding IsAddProductDialogOpen}"
+                Background="#880F172A">
+            <Grid HorizontalAlignment="Center" VerticalAlignment="Center" Width="520">
+                <Border Background="White"
+                        BorderBrush="#D8E0EA"
+                        BorderThickness="1"
+                        CornerRadius="18"
+                        Padding="16">
+                    <StackPanel Spacing="10"
+                                HorizontalAlignment="Stretch">
+                        <TextBlock Text="Добавить товар" FontSize="22" FontWeight="SemiBold" />
+                        <TextBox Text="{Binding NewProductSkuInput}"
+                                 Watermark="Артикул (SKU)"
+                                 HorizontalAlignment="Stretch" />
+                        <TextBox Text="{Binding NewProductQuantityInput}"
+                                 Watermark="Количество"
+                                 HorizontalAlignment="Stretch" />
+                        <TextBox Text="{Binding NewProductNameInput}"
+                                 Watermark="Название (для нового товара)"
+                                 HorizontalAlignment="Stretch" />
+                        <TextBox Text="{Binding NewProductPriceInput}"
+                                 Watermark="Цена продажи (для нового товара)"
+                                 HorizontalAlignment="Stretch" />
+                        <ComboBox ItemsSource="{Binding ProductStatuses}"
+                                  SelectedItem="{Binding NewProductStatus}"
+                                  HorizontalAlignment="Stretch" />
+                        <Grid ColumnDefinitions="*,*"
+                              ColumnSpacing="8"
+                              HorizontalAlignment="Stretch">
+                            <Button Grid.Column="0"
+                                    Content="Сохранить"
+                                    Background="#10B981"
+                                    Foreground="White"
+                                    HorizontalAlignment="Stretch"
+                                    Command="{Binding SaveProductCommand}" />
+                            <Button Grid.Column="1"
+                                    Content="Закрыть (esc)"
+                                    Background="#E2E8F0"
+                                    Foreground="#0F172A"
+                                    HorizontalAlignment="Stretch"
+                                    Command="{Binding ToggleAddProductDialogCommand}" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
+
+        <Border IsVisible="{Binding IsAddExpenseDialogOpen}"
+                Background="#880F172A">
+            <Grid HorizontalAlignment="Center" VerticalAlignment="Center" Width="500">
+                <Border Background="White"
+                        BorderBrush="#D8E0EA"
+                        BorderThickness="1"
+                        CornerRadius="18"
+                        Padding="16">
+                    <StackPanel Spacing="10"
+                                HorizontalAlignment="Stretch">
+                        <TextBlock Text="Добавить расход" FontSize="22" FontWeight="SemiBold" />
+                        <TextBox Text="{Binding ExpenseTotalInput}"
+                                 Watermark="Сумма расхода"
+                                 HorizontalAlignment="Stretch" />
+                        <TextBox Text="{Binding ExpenseDescriptionInput}"
+                                 Watermark="Комментарий/описание"
+                                 HorizontalAlignment="Stretch" />
+                        <Grid ColumnDefinitions="*,*"
+                              ColumnSpacing="8"
+                              HorizontalAlignment="Stretch">
+                            <Button Grid.Column="0"
+                                    Content="Сохранить"
+                                    Background="#10B981"
+                                    Foreground="White"
+                                    HorizontalAlignment="Stretch"
+                                    Command="{Binding AddExpenseCommand}" />
+                            <Button Grid.Column="1"
+                                    Content="Закрыть (esc)"
+                                    Background="#E2E8F0"
+                                    Foreground="#0F172A"
+                                    HorizontalAlignment="Stretch"
+                                    Command="{Binding ToggleAddExpenseDialogCommand}" />
                         </Grid>
                     </StackPanel>
                 </Border>
