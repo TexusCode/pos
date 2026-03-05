@@ -230,12 +230,7 @@ public partial class MainWindowViewModel : ViewModelBase
             LoginResponse response;
             try
             {
-                response = await _apiClient.LoginAsync(new LoginRequest
-                {
-                    Phone = Phone.Trim(),
-                    Password = Password.Trim(),
-                    DeviceName = Environment.MachineName,
-                });
+                response = await LoginWithFallbacksAsync(Phone, Password);
             }
             catch (Exception ex) when (IsConnectivityException(ex))
             {
@@ -261,6 +256,99 @@ public partial class MainWindowViewModel : ViewModelBase
                 ? "Успешный вход"
                 : "Вход выполнен. Оффлайн режим";
         });
+    }
+
+    private async Task<LoginResponse> LoginWithFallbacksAsync(string phoneRaw, string passwordRaw)
+    {
+        var deviceName = Environment.MachineName;
+        var phones = BuildPhoneVariants(phoneRaw);
+        var passwords = BuildPasswordVariants(passwordRaw);
+
+        Exception? lastError = null;
+
+        foreach (var phone in phones)
+        {
+            foreach (var password in passwords)
+            {
+                try
+                {
+                    return await _apiClient.LoginAsync(new LoginRequest
+                    {
+                        Phone = phone,
+                        Password = password,
+                        DeviceName = deviceName,
+                    });
+                }
+                catch (ApiException ex) when (ex.StatusCode == 422 && ex.Message.Contains("Invalid credentials", StringComparison.OrdinalIgnoreCase))
+                {
+                    lastError = ex;
+                }
+            }
+        }
+
+        if (lastError is not null)
+        {
+            throw lastError;
+        }
+
+        throw new InvalidOperationException("Не удалось выполнить вход");
+    }
+
+    private static List<string> BuildPhoneVariants(string rawPhone)
+    {
+        var list = new List<string>();
+        var trimmed = rawPhone.Trim();
+        if (!string.IsNullOrWhiteSpace(trimmed))
+        {
+            list.Add(trimmed);
+        }
+
+        var digits = new string(trimmed.Where(char.IsDigit).ToArray());
+        if (!string.IsNullOrWhiteSpace(digits))
+        {
+            list.Add(digits);
+            list.Add("+" + digits);
+        }
+
+        if (digits.Length == 9)
+        {
+            list.Add("0" + digits);
+            list.Add("992" + digits);
+            list.Add("+992" + digits);
+        }
+
+        if (digits.StartsWith("992", StringComparison.Ordinal) && digits.Length > 3)
+        {
+            var withoutCountry = digits[3..];
+            list.Add(withoutCountry);
+            list.Add("+992" + withoutCountry);
+        }
+
+        if (digits.StartsWith("00", StringComparison.Ordinal) && digits.Length > 2)
+        {
+            var without00 = digits[2..];
+            list.Add(without00);
+            list.Add("+" + without00);
+        }
+
+        if (digits.StartsWith("0", StringComparison.Ordinal) && digits.Length > 1)
+        {
+            list.Add(digits.TrimStart('0'));
+        }
+
+        return list
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+    }
+
+    private static List<string> BuildPasswordVariants(string rawPassword)
+    {
+        var trimmed = rawPassword.Trim();
+        return new List<string> { rawPassword, trimmed }
+            .Where(x => !string.IsNullOrEmpty(x))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
     }
 
     [RelayCommand]
