@@ -1,0 +1,595 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:PosDesktop.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        d:DesignWidth="1420"
+        d:DesignHeight="900"
+        x:Class="PosDesktop.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="TexHub POS Desktop"
+        Width="1420"
+        Height="900"
+        MinWidth="1180"
+        MinHeight="760"
+        Background="#F1F5F9">
+
+    <Design.DataContext>
+        <vm:MainWindowViewModel />
+    </Design.DataContext>
+
+    <Grid>
+        <Grid IsVisible="{Binding IsLoginScreen}"
+              HorizontalAlignment="Center"
+              VerticalAlignment="Center"
+              Width="460">
+            <Border CornerRadius="22"
+                    Padding="24"
+                    BorderBrush="#D8E0EA"
+                    BorderThickness="1"
+                    Background="White">
+                <StackPanel Spacing="14">
+                    <TextBlock Text="Вход в систему"
+                               FontWeight="SemiBold"
+                               FontSize="30"
+                               Foreground="#0F172A" />
+                    <TextBlock Text="Введите номер телефона и пароль"
+                               Foreground="#475569"
+                               Margin="0,0,0,10" />
+
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Номер телефона" Foreground="#334155" />
+                        <TextBox Text="{Binding Phone}"
+                                 Watermark="Введите номер телефона"
+                                 Height="42" />
+                    </StackPanel>
+
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Пароль" Foreground="#334155" />
+                        <TextBox Text="{Binding Password}"
+                                 PasswordChar="*"
+                                 Watermark="Введите пароль"
+                                 Height="42" />
+                    </StackPanel>
+
+                    <Button Content="Войти"
+                            Height="44"
+                            Background="#10B981"
+                            Foreground="White"
+                            FontWeight="SemiBold"
+                            Command="{Binding LoginCommand}" />
+
+                    <TextBlock Text="{Binding ApiBaseUrl, StringFormat=API: {0}}"
+                               Foreground="#64748B"
+                               FontSize="12" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <Grid IsVisible="{Binding IsShiftScreen}"
+              HorizontalAlignment="Center"
+              VerticalAlignment="Center"
+              Width="540">
+            <Border CornerRadius="24"
+                    Padding="24"
+                    BorderBrush="#D8E0EA"
+                    BorderThickness="1"
+                    Background="White">
+                <StackPanel Spacing="14">
+                    <TextBlock Text="Создание смены"
+                               FontWeight="SemiBold"
+                               FontSize="30"
+                               Foreground="#0F172A" />
+                    <TextBlock Text="Смена не открыта. Укажите стартовую сумму и начните работу."
+                               Foreground="#475569"
+                               TextWrapping="Wrap" />
+
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Начальная наличность" Foreground="#334155" />
+                        <TextBox Text="{Binding InitialCashInput}"
+                                 Watermark="Введите сумму"
+                                 Height="42" />
+                    </StackPanel>
+
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="10" Margin="0,8,0,0">
+                        <Button Grid.Column="0"
+                                Content="Открыть смену"
+                                Height="44"
+                                Background="#10B981"
+                                Foreground="White"
+                                FontWeight="SemiBold"
+                                Command="{Binding OpenShiftCommand}" />
+                        <Button Grid.Column="1"
+                                Content="Выйти"
+                                Height="44"
+                                Background="#F43F5E"
+                                Foreground="White"
+                                FontWeight="SemiBold"
+                                Command="{Binding LogoutCommand}" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <Grid IsVisible="{Binding IsPosScreen}"
+              RowDefinitions="Auto,*"
+              Margin="14">
+            <StackPanel Grid.Row="0" Spacing="8" Margin="0,0,0,8">
+                <Border IsVisible="{Binding HasErrorMessage}"
+                        CornerRadius="10"
+                        Padding="12,8"
+                        Background="#FFE4E6">
+                    <TextBlock Text="{Binding ErrorMessage}"
+                               Foreground="#BE123C" />
+                </Border>
+                <Border IsVisible="{Binding HasStatusMessage}"
+                        CornerRadius="10"
+                        Padding="12,8"
+                        Background="#DCFCE7">
+                    <TextBlock Text="{Binding StatusMessage}"
+                               Foreground="#166534" />
+                </Border>
+            </StackPanel>
+
+            <Grid Grid.Row="1"
+                  ColumnDefinitions="290,*,430"
+                  ColumnSpacing="14">
+                <Border Grid.Column="0"
+                        CornerRadius="20"
+                        Background="White"
+                        BorderBrush="#D8E0EA"
+                        BorderThickness="1"
+                        Padding="14">
+                    <Grid RowDefinitions="Auto,Auto,*">
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="TexHub POS"
+                                       Foreground="#64748B"
+                                       FontSize="12" />
+                            <TextBlock Text="Кассовая панель"
+                                       FontSize="28"
+                                       FontWeight="SemiBold"
+                                       Foreground="#0F172A" />
+                            <TextBlock Text="{Binding ShiftNumberLabel}"
+                                       Foreground="#334155"
+                                       Margin="0,2,0,0" />
+                            <TextBlock Text="{Binding UserNameLabel, StringFormat=Кассир: {0}}"
+                                       Foreground="#334155" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="1" Margin="0,14,0,14" Spacing="8">
+                            <Button Content="Закрыть смену"
+                                    Background="#10B981"
+                                    Foreground="White"
+                                    Height="42"
+                                    Command="{Binding ToggleCloseShiftDialogCommand}" />
+                            <Button Content="Новая корзина"
+                                    Background="#06B6D4"
+                                    Foreground="White"
+                                    Height="42"
+                                    Command="{Binding NewCartCommand}" />
+                            <Button Content="Обновить"
+                                    Background="#94A3B8"
+                                    Foreground="White"
+                                    Height="42"
+                                    Command="{Binding RefreshAllCommand}" />
+                            <Button Content="Выйти из аккаунта"
+                                    Background="#F43F5E"
+                                    Foreground="White"
+                                    Height="42"
+                                    Command="{Binding LogoutCommand}" />
+                        </StackPanel>
+
+                        <Border Grid.Row="2"
+                                CornerRadius="14"
+                                BorderBrush="#E2E8F0"
+                                BorderThickness="1"
+                                Background="#F8FAFC"
+                                Padding="10">
+                            <Grid RowDefinitions="Auto,*">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Stretch">
+                                    <TextBlock Text="Список корзин"
+                                               FontWeight="SemiBold"
+                                               Foreground="#0F172A" />
+                                    <Border CornerRadius="10"
+                                            Background="#E2E8F0"
+                                            Padding="6,2"
+                                            HorizontalAlignment="Right"
+                                            Margin="8,0,0,0">
+                                        <TextBlock Text="{Binding CartCount}" Foreground="#475569" />
+                                    </Border>
+                                </StackPanel>
+                                <ScrollViewer Grid.Row="1" Margin="0,8,0,0">
+                                    <ItemsControl ItemsSource="{Binding Carts}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Button Margin="0,0,0,8"
+                                                        Height="40"
+                                                        HorizontalContentAlignment="Left"
+                                                        Content="{Binding Id, StringFormat=Корзина #{0}}"
+                                                        Command="{Binding DataContext.SelectCartCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                        CommandParameter="{Binding .}" />
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Column="1"
+                        CornerRadius="20"
+                        Background="White"
+                        BorderBrush="#D8E0EA"
+                        BorderThickness="1"
+                        Padding="14">
+                    <Grid RowDefinitions="Auto,Auto,Auto,*">
+                        <TextBlock Text="Сканирование"
+                                   Foreground="#64748B"
+                                   FontSize="12" />
+                        <Grid Grid.Row="1" ColumnDefinitions="*,Auto" ColumnSpacing="8" Margin="0,6,0,0">
+                            <TextBox Grid.Column="0"
+                                     Text="{Binding BarcodeInput}"
+                                     Watermark="Сканируй штрих-код"
+                                     Height="42" />
+                            <Button Grid.Column="1"
+                                    Content="Добавить"
+                                    Height="42"
+                                    Background="#06B6D4"
+                                    Foreground="White"
+                                    Command="{Binding AddByBarcodeCommand}" />
+                        </Grid>
+
+                        <Grid Grid.Row="2" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" Margin="0,10,0,10">
+                            <TextBox Grid.Column="0"
+                                     Text="{Binding SearchText}"
+                                     Watermark="Поиск товара"
+                                     Height="38" />
+                            <Button Grid.Column="1"
+                                    Content="Поиск"
+                                    Height="38"
+                                    Background="#0EA5E9"
+                                    Foreground="White"
+                                    Command="{Binding RefreshProductsCommand}" />
+                            <Border Grid.Column="2"
+                                    CornerRadius="10"
+                                    Padding="10,6"
+                                    Background="#E0F2FE">
+                                <TextBlock Text="{Binding ProductCount, StringFormat={}{0} позиций}"
+                                           Foreground="#0C4A6E" />
+                            </Border>
+                        </Grid>
+
+                        <ScrollViewer Grid.Row="3">
+                            <ItemsControl ItemsSource="{Binding Products}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border CornerRadius="12"
+                                                BorderBrush="#E2E8F0"
+                                                BorderThickness="1"
+                                                Background="#F8FAFC"
+                                                Margin="0,0,0,8"
+                                                Padding="10">
+                                            <Grid ColumnDefinitions="*,Auto,Auto"
+                                                  ColumnSpacing="12">
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Name}"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="#0F172A"
+                                                               TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{Binding Quantity, StringFormat=Остаток: {0}}"
+                                                               Foreground="#64748B"
+                                                               FontSize="12" />
+                                                </StackPanel>
+                                                <TextBlock Grid.Column="1"
+                                                           VerticalAlignment="Center"
+                                                           Text="{Binding SellingPrice, StringFormat={}{0:0.##} c}"
+                                                           FontWeight="Bold"
+                                                           Foreground="#B45309" />
+                                                <Button Grid.Column="2"
+                                                        Content="Добавить"
+                                                        Height="34"
+                                                        Background="#06B6D4"
+                                                        Foreground="White"
+                                                        Command="{Binding DataContext.AddProductToCartCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                        CommandParameter="{Binding .}" />
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Column="2"
+                        CornerRadius="20"
+                        Background="White"
+                        BorderBrush="#D8E0EA"
+                        BorderThickness="1"
+                        Padding="14">
+                    <Grid RowDefinitions="Auto,*,Auto">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel>
+                                <TextBlock Text="Активная смена"
+                                           Foreground="#64748B"
+                                           FontSize="12" />
+                                <TextBlock Text="{Binding ShiftNumberLabel}"
+                                           FontSize="24"
+                                           FontWeight="SemiBold"
+                                           Foreground="#0F172A" />
+                            </StackPanel>
+                            <Border Grid.Column="1"
+                                    CornerRadius="12"
+                                    Padding="10,6"
+                                    Background="#DCFCE7"
+                                    VerticalAlignment="Top">
+                                <TextBlock Text="{Binding SelectedCartItemsCount, StringFormat=Товаров: {0}}"
+                                           Foreground="#166534" />
+                            </Border>
+                        </Grid>
+
+                        <ScrollViewer Grid.Row="1" Margin="0,10,0,10">
+                            <ItemsControl ItemsSource="{Binding CartItems}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border CornerRadius="12"
+                                                BorderBrush="#E2E8F0"
+                                                BorderThickness="1"
+                                                Margin="0,0,0,8"
+                                                Background="#F8FAFC"
+                                                Padding="8">
+                                            <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
+                                                <TextBlock Text="{Binding ProductName}"
+                                                           VerticalAlignment="Center"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="#0F172A"
+                                                           TextTrimming="CharacterEllipsis" />
+                                                <Grid Grid.Column="1" ColumnDefinitions="Auto,Auto,Auto" VerticalAlignment="Center">
+                                                    <Button Grid.Column="0"
+                                                            Width="30"
+                                                            Height="30"
+                                                            Content="-"
+                                                            Command="{Binding DataContext.DecrementItemCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                            CommandParameter="{Binding .}" />
+                                                    <TextBlock Grid.Column="1"
+                                                               Margin="8,0"
+                                                               VerticalAlignment="Center"
+                                                               Text="{Binding Quantity}"
+                                                               FontWeight="SemiBold" />
+                                                    <Button Grid.Column="2"
+                                                            Width="30"
+                                                            Height="30"
+                                                            Content="+"
+                                                            Command="{Binding DataContext.IncrementItemCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                            CommandParameter="{Binding .}" />
+                                                </Grid>
+                                                <TextBlock Grid.Column="2"
+                                                           VerticalAlignment="Center"
+                                                           Text="{Binding LineSubtotal, StringFormat={}{0:0.##} c}"
+                                                           FontWeight="Bold"
+                                                           Foreground="#B45309" />
+                                                <Button Grid.Column="3"
+                                                        Width="32"
+                                                        Height="32"
+                                                        Content="✕"
+                                                        Background="#FFE4E6"
+                                                        Foreground="#BE123C"
+                                                        Command="{Binding DataContext.RemoveItemCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                        CommandParameter="{Binding .}" />
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+
+                        <Border Grid.Row="2"
+                                CornerRadius="14"
+                                BorderBrush="#E2E8F0"
+                                BorderThickness="1"
+                                Background="#F8FAFC"
+                                Padding="10">
+                            <StackPanel Spacing="8">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Text="Подытог" Foreground="#64748B" />
+                                    <TextBlock Grid.Column="1"
+                                               Text="{Binding Subtotal, StringFormat={}{0:0.##} c}"
+                                               FontWeight="SemiBold" />
+                                </Grid>
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Text="Скидка" Foreground="#64748B" />
+                                    <TextBlock Grid.Column="1"
+                                               Text="{Binding DiscountTotal, StringFormat={}{0:0.##} c}"
+                                               FontWeight="SemiBold"
+                                               Foreground="#15803D" />
+                                </Grid>
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Text="Итог" Foreground="#64748B" />
+                                    <TextBlock Grid.Column="1"
+                                               Text="{Binding Total, StringFormat={}{0:0.##} c}"
+                                               FontSize="20"
+                                               FontWeight="Bold"
+                                               Foreground="#B45309" />
+                                </Grid>
+
+                                <Grid ColumnDefinitions="*,*" ColumnSpacing="8" Margin="0,8,0,0">
+                                    <Button Grid.Column="0"
+                                            Content="Скидка"
+                                            Background="#F43F5E"
+                                            Foreground="White"
+                                            Command="{Binding ToggleDiscountDialogCommand}" />
+                                    <Button Grid.Column="1"
+                                            Content="Оформить"
+                                            Background="#06B6D4"
+                                            Foreground="White"
+                                            Command="{Binding ToggleCheckoutDialogCommand}" />
+                                </Grid>
+                                <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                    <Button Grid.Column="0"
+                                            Content="Держать"
+                                            Background="#CBD5E1"
+                                            Foreground="#0F172A"
+                                            Command="{Binding NewCartCommand}" />
+                                    <Button Grid.Column="1"
+                                            Content="Сбросить"
+                                            Background="#F43F5E"
+                                            Foreground="White"
+                                            Command="{Binding ResetCartCommand}" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Grid>
+
+        <Border IsVisible="{Binding IsDiscountDialogOpen}"
+                Background="#880F172A">
+            <Grid HorizontalAlignment="Center" VerticalAlignment="Center" Width="400">
+                <Border Background="White"
+                        BorderBrush="#D8E0EA"
+                        BorderThickness="1"
+                        CornerRadius="18"
+                        Padding="16">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Скидка на корзину" FontSize="22" FontWeight="SemiBold" />
+                        <ComboBox ItemsSource="{Binding DiscountTypes}" SelectedItem="{Binding DiscountType}" />
+                        <TextBox Text="{Binding DiscountValueInput}"
+                                 Watermark="Введите сумму или процент" />
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                            <Button Grid.Column="0"
+                                    Content="Применить"
+                                    Background="#10B981"
+                                    Foreground="White"
+                                    Command="{Binding ApplyDiscountCommand}" />
+                            <Button Grid.Column="1"
+                                    Content="Закрыть"
+                                    Background="#E2E8F0"
+                                    Foreground="#0F172A"
+                                    Command="{Binding ToggleDiscountDialogCommand}" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
+
+        <Border IsVisible="{Binding IsCheckoutDialogOpen}"
+                Background="#880F172A">
+            <Grid HorizontalAlignment="Center" VerticalAlignment="Center" Width="520">
+                <Border Background="White"
+                        BorderBrush="#D8E0EA"
+                        BorderThickness="1"
+                        CornerRadius="18"
+                        Padding="16">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Оформить заказ" FontSize="22" FontWeight="SemiBold" />
+                        <ComboBox ItemsSource="{Binding PaymentMethods}" SelectedItem="{Binding PaymentMethod}" />
+
+                        <TextBox IsVisible="{Binding IsDebtPayment}"
+                                 Text="{Binding CustomerName}"
+                                 Watermark="Имя клиента" />
+                        <TextBox IsVisible="{Binding IsDebtPayment}"
+                                 Text="{Binding CustomerPhone}"
+                                 Watermark="Телефон клиента" />
+
+                        <TextBox Text="{Binding CashInput}" Watermark="Полученная сумма" />
+                        <TextBox Text="{Binding OrderNote}" Watermark="Комментарий (необязательно)" />
+
+                        <Border BorderBrush="#E2E8F0"
+                                BorderThickness="1"
+                                CornerRadius="12"
+                                Padding="10"
+                                Background="#F8FAFC">
+                            <StackPanel Spacing="6">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Text="Подытог" Foreground="#64748B" />
+                                    <TextBlock Grid.Column="1"
+                                               Text="{Binding Subtotal, StringFormat={}{0:0.##} c}" />
+                                </Grid>
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Text="Скидка" Foreground="#64748B" />
+                                    <TextBlock Grid.Column="1"
+                                               Text="{Binding DiscountTotal, StringFormat={}{0:0.##} c}" />
+                                </Grid>
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Text="Итог" Foreground="#64748B" />
+                                    <TextBlock Grid.Column="1"
+                                               Text="{Binding Total, StringFormat={}{0:0.##} c}"
+                                               FontWeight="Bold" />
+                                </Grid>
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Text="Сдача" Foreground="#64748B" />
+                                    <TextBlock Grid.Column="1"
+                                               Text="{Binding ChangeAmount, StringFormat={}{0:0.##} c}"
+                                               FontWeight="Bold"
+                                               Foreground="#0369A1" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                            <Button Grid.Column="0"
+                                    Content="Оформить"
+                                    Background="#10B981"
+                                    Foreground="White"
+                                    Command="{Binding CheckoutCommand}" />
+                            <Button Grid.Column="1"
+                                    Content="Закрыть"
+                                    Background="#E2E8F0"
+                                    Foreground="#0F172A"
+                                    Command="{Binding ToggleCheckoutDialogCommand}" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
+
+        <Border IsVisible="{Binding IsCloseShiftDialogOpen}"
+                Background="#880F172A">
+            <Grid HorizontalAlignment="Center" VerticalAlignment="Center" Width="420">
+                <Border Background="White"
+                        BorderBrush="#D8E0EA"
+                        BorderThickness="1"
+                        CornerRadius="18"
+                        Padding="16">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Закрыть смену" FontSize="22" FontWeight="SemiBold" />
+                        <TextBox Text="{Binding FinalCashInput}" Watermark="Наличными в кассе" />
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                            <Button Grid.Column="0"
+                                    Content="Закрыть смену"
+                                    Background="#10B981"
+                                    Foreground="White"
+                                    Command="{Binding CloseShiftCommand}" />
+                            <Button Grid.Column="1"
+                                    Content="Отмена"
+                                    Background="#E2E8F0"
+                                    Foreground="#0F172A"
+                                    Command="{Binding ToggleCloseShiftDialogCommand}" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
+
+        <Border IsVisible="{Binding IsBusy}"
+                Background="#66F1F5F9">
+            <Grid HorizontalAlignment="Center"
+                  VerticalAlignment="Center"
+                  Width="220">
+                <Border CornerRadius="16"
+                        Padding="14"
+                        Background="White"
+                        BorderBrush="#D8E0EA"
+                        BorderThickness="1">
+                    <StackPanel Spacing="8" HorizontalAlignment="Center">
+                        <ProgressBar IsIndeterminate="True" Width="180" />
+                        <TextBlock Text="Загрузка..." HorizontalAlignment="Center" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
