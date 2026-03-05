@@ -6,6 +6,24 @@ public sealed class ProductListResponse
 {
     [JsonPropertyName("items")]
     public List<ProductDto> Items { get; set; } = [];
+
+    [JsonPropertyName("meta")]
+    public ProductListMeta Meta { get; set; } = new();
+}
+
+public sealed class ProductListMeta
+{
+    [JsonPropertyName("current_page")]
+    public int CurrentPage { get; set; } = 1;
+
+    [JsonPropertyName("last_page")]
+    public int LastPage { get; set; } = 1;
+
+    [JsonPropertyName("per_page")]
+    public int PerPage { get; set; } = 50;
+
+    [JsonPropertyName("total")]
+    public int Total { get; set; }
 }
 
 public sealed class ProductEnvelope

@@ -3,6 +3,7 @@ using System.Net;
 using System.Text.RegularExpressions;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using PosDesktop.Models.Api;
 
 namespace PosDesktop.Services;
@@ -13,6 +14,7 @@ public sealed class PosApiClient
     private readonly JsonSerializerOptions _jsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,
+        NumberHandling = JsonNumberHandling.AllowReadingFromString,
     };
 
     private readonly string _baseUrl;
@@ -77,11 +79,37 @@ public sealed class PosApiClient
             cancellationToken);
     }
 
-    public Task<ProductListResponse> GetProductsAsync(string? search, CancellationToken cancellationToken = default)
+    public Task<ProductListResponse> GetProductsAsync(
+        string? search,
+        string? status = null,
+        int? perPage = null,
+        int? page = null,
+        CancellationToken cancellationToken = default)
     {
-        var query = string.IsNullOrWhiteSpace(search)
+        var queryParts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            queryParts.Add($"search={Uri.EscapeDataString(search)}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            queryParts.Add($"status={Uri.EscapeDataString(status)}");
+        }
+
+        if (perPage.HasValue && perPage.Value > 0)
+        {
+            queryParts.Add($"per_page={perPage.Value}");
+        }
+
+        if (page.HasValue && page.Value > 0)
+        {
+            queryParts.Add($"page={page.Value}");
+        }
+
+        var query = queryParts.Count == 0
             ? string.Empty
-            : $"?search={Uri.EscapeDataString(search)}";
+            : "?" + string.Join("&", queryParts);
 
         return SendAsync<ProductListResponse>(HttpMethod.Get, $"{ApiPrefix}/products{query}", null, cancellationToken);
     }
@@ -186,13 +214,21 @@ public sealed class PosApiClient
             return default!;
         }
 
-        var result = JsonSerializer.Deserialize<T>(responseText, _jsonOptions);
-        if (result is null)
+        try
         {
-            throw new ApiException("Server returned empty response", (int)response.StatusCode);
-        }
+            var result = JsonSerializer.Deserialize<T>(responseText, _jsonOptions);
+            if (result is null)
+            {
+                throw new ApiException("Server returned empty response", (int)response.StatusCode);
+            }
 
-        return result;
+            return result;
+        }
+        catch (JsonException ex)
+        {
+            var snippet = responseText.Length > 220 ? responseText[..220] : responseText;
+            throw new ApiException($"Ошибка формата ответа API: {ex.Message}. Ответ: {snippet}", (int)response.StatusCode);
+        }
     }
 
     private static string ExtractApiErrorMessage(string responseText)

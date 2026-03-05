@@ -29,6 +29,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly SemaphoreSlim _syncGate = new(1, 1);
     private readonly DispatcherTimer _syncTimer;
     private string? _accessToken;
+    private bool _didFullActiveProductsSync;
 
     public MainWindowViewModel()
     {
@@ -55,6 +56,7 @@ public partial class MainWindowViewModel : ViewModelBase
     public ObservableCollection<CartItemDto> CartItems { get; } = [];
     public IReadOnlyList<string> PaymentMethods { get; } = ["Наличными", "Карта", "В долг"];
     public IReadOnlyList<string> DiscountTypes { get; } = ["fixed", "percent"];
+    public IReadOnlyList<string> ItemDiscountTypes { get; } = ["fixed", "percent"];
 
     [ObservableProperty]
     private AppScreen _currentScreen = AppScreen.Login;
@@ -128,6 +130,18 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isCloseShiftDialogOpen;
 
+    [ObservableProperty]
+    private bool _isItemDiscountDialogOpen;
+
+    [ObservableProperty]
+    private CartItemDto? _selectedDiscountItem;
+
+    [ObservableProperty]
+    private string _itemDiscountValueInput = string.Empty;
+
+    [ObservableProperty]
+    private string _itemDiscountType = "fixed";
+
     public bool IsLoginScreen => CurrentScreen == AppScreen.Login;
     public bool IsShiftScreen => CurrentScreen == AppScreen.Shift;
     public bool IsPosScreen => CurrentScreen == AppScreen.Pos;
@@ -175,6 +189,14 @@ public partial class MainWindowViewModel : ViewModelBase
             }
         }
 
+        if (SelectedDiscountItem is not null
+            && (value is null || !value.Items.Any(x => x.Id == SelectedDiscountItem.Id)))
+        {
+            IsItemDiscountDialogOpen = false;
+            SelectedDiscountItem = null;
+            ItemDiscountValueInput = string.Empty;
+        }
+
         OnPropertyChanged(nameof(SelectedCartItemsCount));
         OnPropertyChanged(nameof(Subtotal));
         OnPropertyChanged(nameof(DiscountTotal));
@@ -203,6 +225,16 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     partial void OnSearchTextChanged(string value)
+    {
+        if (!IsPosScreen)
+        {
+            return;
+        }
+
+        _ = LoadProductsFromLocalAsync();
+    }
+
+    partial void OnBarcodeInputChanged(string value)
     {
         if (!IsPosScreen)
         {
@@ -583,6 +615,32 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    private async Task HoldCartAsync()
+    {
+        if (SelectedCart is null)
+        {
+            return;
+        }
+
+        await ExecuteBusyAsync(async () =>
+        {
+            if (SelectedCart is null)
+            {
+                return;
+            }
+
+            if (SelectedCart.Items.Count == 0)
+            {
+                throw new InvalidOperationException("Нельзя держать пустую корзину. Добавьте хотя бы 1 товар.");
+            }
+
+            await CreateAndSelectNewLocalCartAsync();
+            _ = TrySyncNowAsync(forcePullFromServer: false, silent: true);
+            StatusMessage = "Заказ удержан. Можно оформить позже.";
+        });
+    }
+
+    [RelayCommand]
     private async Task ResetCartAsync()
     {
         if (SelectedCart is null || CurrentUser is null)
@@ -592,22 +650,14 @@ public partial class MainWindowViewModel : ViewModelBase
 
         await ExecuteBusyAsync(async () =>
         {
-            var record = await _localStore.GetCartRecordAsync(CurrentUser.Id.ToString(CultureInfo.InvariantCulture), SelectedCart.Id);
-            if (record is null)
-            {
-                return;
-            }
-
-            record.State = LocalCartStates.Deleted;
-            record.IsDirty = true;
-            record.PendingCheckout = null;
-            await _localStore.SaveCartRecordAsync(record);
-
-            RemoveCartFromCollection(record.ClientId);
-            await EnsureActiveCartAsync();
+            var cart = CloneCart(SelectedCart);
+            cart.Items.Clear();
+            cart.Discount = 0;
+            RecalculateCart(cart);
+            await SaveActiveCartAsync(cart, isDirty: true);
 
             _ = TrySyncNowAsync(forcePullFromServer: false, silent: true);
-            StatusMessage = "Корзина очищена";
+            StatusMessage = "Корзина сброшена";
         });
     }
 
@@ -695,6 +745,105 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    private void OpenItemDiscountDialog(CartItemDto? item)
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        SelectedDiscountItem = item;
+        ItemDiscountValueInput = item.Discount > 0
+            ? item.Discount.ToString("0.##", CultureInfo.InvariantCulture)
+            : string.Empty;
+        ItemDiscountType = "fixed";
+        IsItemDiscountDialogOpen = true;
+    }
+
+    [RelayCommand]
+    private void ToggleItemDiscountDialog()
+    {
+        IsItemDiscountDialogOpen = !IsItemDiscountDialogOpen;
+        if (!IsItemDiscountDialogOpen)
+        {
+            SelectedDiscountItem = null;
+            ItemDiscountValueInput = string.Empty;
+            ItemDiscountType = "fixed";
+        }
+    }
+
+    [RelayCommand]
+    private async Task ApplyItemDiscountAsync()
+    {
+        if (!IsItemDiscountDialogOpen || SelectedCart is null || SelectedDiscountItem is null)
+        {
+            return;
+        }
+
+        await ExecuteBusyAsync(async () =>
+        {
+            if (string.IsNullOrWhiteSpace(ItemDiscountValueInput))
+            {
+                throw new InvalidOperationException("Введите сумму скидки");
+            }
+
+            var cart = CloneCart(SelectedCart);
+            var localItem = cart.Items.FirstOrDefault(x => x.Id == SelectedDiscountItem.Id);
+            if (localItem is null)
+            {
+                throw new InvalidOperationException("Товар не найден в корзине");
+            }
+
+            var discountValue = ParseMoney(ItemDiscountValueInput);
+            var lineSubtotalRaw = localItem.Price * localItem.Quantity;
+            var discount = ItemDiscountType == "percent"
+                ? Round2((lineSubtotalRaw * discountValue) / 100m)
+                : discountValue;
+
+            var cappedDiscount = Math.Min(Math.Max(0, discount), Round2(lineSubtotalRaw));
+            localItem.Discount = cappedDiscount;
+
+            RecalculateCart(cart);
+            await SaveActiveCartAsync(cart, isDirty: true);
+
+            IsItemDiscountDialogOpen = false;
+            SelectedDiscountItem = null;
+            ItemDiscountValueInput = string.Empty;
+            ItemDiscountType = "fixed";
+
+            _ = TrySyncNowAsync(forcePullFromServer: false, silent: true);
+            StatusMessage = "Скидка на товар применена";
+        });
+    }
+
+    [RelayCommand]
+    private void CloseOpenDialog()
+    {
+        if (IsItemDiscountDialogOpen)
+        {
+            ToggleItemDiscountDialog();
+            return;
+        }
+
+        if (IsDiscountDialogOpen)
+        {
+            ToggleDiscountDialog();
+            return;
+        }
+
+        if (IsCheckoutDialogOpen)
+        {
+            ToggleCheckoutDialog();
+            return;
+        }
+
+        if (IsCloseShiftDialogOpen)
+        {
+            ToggleCloseShiftDialog();
+        }
+    }
+
+    [RelayCommand]
     private void ToggleDiscountDialog()
     {
         IsDiscountDialogOpen = !IsDiscountDialogOpen;
@@ -703,7 +852,7 @@ public partial class MainWindowViewModel : ViewModelBase
     [RelayCommand]
     private async Task ApplyDiscountAsync()
     {
-        if (SelectedCart is null)
+        if (!IsDiscountDialogOpen || SelectedCart is null)
         {
             return;
         }
@@ -967,7 +1116,11 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private async Task LoadProductsFromLocalAsync()
     {
-        var products = await _localStore.LoadProductsAsync(SearchText);
+        var search = string.IsNullOrWhiteSpace(BarcodeInput)
+            ? SearchText
+            : BarcodeInput;
+
+        var products = await _localStore.LoadProductsAsync(search, activeOnly: true);
 
         Products.Clear();
         foreach (var product in products)
@@ -1102,7 +1255,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 return existing;
             }
 
-            var all = await _localStore.LoadProductsAsync();
+            var all = await _localStore.LoadProductsAsync(activeOnly: true);
             return all.FirstOrDefault(x => x.Id == request.ProductId.Value);
         }
 
@@ -1114,7 +1267,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 return existing;
             }
 
-            var all = await _localStore.LoadProductsAsync();
+            var all = await _localStore.LoadProductsAsync(activeOnly: true);
             return all.FirstOrDefault(x => string.Equals(x.Sku, request.Sku, StringComparison.OrdinalIgnoreCase));
         }
 
@@ -1297,10 +1450,11 @@ public partial class MainWindowViewModel : ViewModelBase
             CurrentShift = shiftResponse.Shift;
             await _localStore.SaveShiftAsync(shiftResponse.Shift);
 
-            if (forcePullFromServer || ProductCount == 0)
+            if (forcePullFromServer || ProductCount == 0 || !_didFullActiveProductsSync)
             {
-                var productsResponse = await _apiClient.GetProductsAsync(null);
-                await _localStore.SaveProductsAsync(productsResponse.Items);
+                var allActiveProducts = await LoadAllActiveProductsFromServerAsync();
+                await _localStore.SaveProductsAsync(allActiveProducts);
+                _didFullActiveProductsSync = true;
             }
 
             var cartsResponse = await _apiClient.GetCartsAsync();
@@ -1343,10 +1497,50 @@ public partial class MainWindowViewModel : ViewModelBase
                 StatusMessage = "Оффлайн режим. Данные будут синхронизированы автоматически";
             }
         }
+        catch (Exception ex)
+        {
+            if (!silent)
+            {
+                ErrorMessage = "Ошибка синхронизации: " + ex.Message;
+            }
+        }
         finally
         {
             _syncGate.Release();
         }
+    }
+
+    private async Task<List<ProductDto>> LoadAllActiveProductsFromServerAsync()
+    {
+        const int perPage = 200;
+        const int maxPages = 200;
+        var page = 1;
+        var lastPage = 1;
+        var all = new List<ProductDto>();
+
+        do
+        {
+            var response = await _apiClient.GetProductsAsync(
+                search: null,
+                status: "active",
+                perPage: perPage,
+                page: page);
+
+            if (response.Items.Count > 0)
+            {
+                all.AddRange(response.Items);
+            }
+
+            var metaLastPage = response.Meta?.LastPage ?? 1;
+            lastPage = Math.Max(1, metaLastPage);
+            page++;
+        } while (page <= lastPage && page <= maxPages);
+
+        return all
+            .GroupBy(x => x.Id)
+            .Select(g => g.First())
+            .OrderByDescending(x => x.Id)
+            .ToList();
     }
 
     private async Task SyncCartsAsync(string userId)
@@ -1429,12 +1623,30 @@ public partial class MainWindowViewModel : ViewModelBase
                 continue;
             }
 
-            await _apiClient.AddItemToCartAsync(serverCartId, new AddCartItemRequest
+            var addResponse = await _apiClient.AddItemToCartAsync(serverCartId, new AddCartItemRequest
             {
                 ProductId = item.ProductId,
                 Sku = item.ProductSku,
                 Quantity = item.Quantity,
             });
+
+            if (item.Discount > 0)
+            {
+                var serverItem = addResponse.Cart.Items.FirstOrDefault(x => x.ProductId == item.ProductId);
+                if (serverItem is null)
+                {
+                    var latestCart = await _apiClient.GetCartAsync(serverCartId);
+                    serverItem = latestCart.Cart.Items.FirstOrDefault(x => x.ProductId == item.ProductId);
+                }
+
+                if (serverItem is not null)
+                {
+                    await _apiClient.UpdateCartItemAsync(serverCartId, serverItem.Id, new UpdateCartItemRequest
+                    {
+                        Discount = item.Discount,
+                    });
+                }
+            }
         }
 
         if (record.Cart.Discount > 0)
@@ -1458,7 +1670,7 @@ public partial class MainWindowViewModel : ViewModelBase
             Status = "open",
             InitialCash = initialCash,
             StartTime = DateTime.UtcNow.ToString("O"),
-            UserId = CurrentUser?.Id,
+            UserId = CurrentUser?.Id.ToString(CultureInfo.InvariantCulture),
         };
     }
 
@@ -1472,7 +1684,7 @@ public partial class MainWindowViewModel : ViewModelBase
             FinalCash = finalCash,
             StartTime = CurrentShift?.StartTime,
             EndTime = DateTime.UtcNow.ToString("O"),
-            UserId = CurrentUser?.Id,
+            UserId = CurrentUser?.Id.ToString(CultureInfo.InvariantCulture),
             SubTotal = CurrentShift?.SubTotal,
             Total = CurrentShift?.Total,
             Discounts = CurrentShift?.Discounts,
@@ -1551,6 +1763,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
         _accessToken = null;
         _apiClient.ClearBearerToken();
+        _didFullActiveProductsSync = false;
 
         CurrentUser = null;
         CurrentShift = null;

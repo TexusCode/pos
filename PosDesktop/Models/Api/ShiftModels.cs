@@ -53,7 +53,7 @@ public sealed class ShiftDto
     public decimal? Debts { get; set; }
 
     [JsonPropertyName("user_id")]
-    public int? UserId { get; set; }
+    public string? UserId { get; set; }
 
     [JsonPropertyName("orders_count")]
     public int? OrdersCount { get; set; }

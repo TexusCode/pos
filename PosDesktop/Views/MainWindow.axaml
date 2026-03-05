@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:PosDesktop.ViewModels"
+        xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Avalonia.Svg.Skia"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
@@ -18,6 +19,36 @@
     <Design.DataContext>
         <vm:MainWindowViewModel />
     </Design.DataContext>
+
+    <Window.KeyBindings>
+        <KeyBinding Gesture="Meta+Shift+S" Command="{Binding ToggleCloseShiftDialogCommand}" />
+        <KeyBinding Gesture="Control+Shift+S" Command="{Binding ToggleCloseShiftDialogCommand}" />
+
+        <KeyBinding Gesture="Meta+R" Command="{Binding RefreshAllCommand}" />
+        <KeyBinding Gesture="Control+R" Command="{Binding RefreshAllCommand}" />
+
+        <KeyBinding Gesture="Meta+Shift+Q" Command="{Binding LogoutCommand}" />
+        <KeyBinding Gesture="Control+Shift+Q" Command="{Binding LogoutCommand}" />
+
+        <KeyBinding Gesture="Meta+M" Command="{Binding ToggleDiscountDialogCommand}" />
+        <KeyBinding Gesture="Control+M" Command="{Binding ToggleDiscountDialogCommand}" />
+        <KeyBinding Gesture="Meta+Shift+M" Command="{Binding ApplyDiscountCommand}" />
+        <KeyBinding Gesture="Control+Shift+M" Command="{Binding ApplyDiscountCommand}" />
+        <KeyBinding Gesture="Meta+Shift+D" Command="{Binding ApplyItemDiscountCommand}" />
+        <KeyBinding Gesture="Control+Shift+D" Command="{Binding ApplyItemDiscountCommand}" />
+        <KeyBinding Gesture="Escape" Command="{Binding CloseOpenDialogCommand}" />
+
+        <KeyBinding Gesture="Meta+Enter" Command="{Binding ToggleCheckoutDialogCommand}" />
+        <KeyBinding Gesture="Control+Enter" Command="{Binding ToggleCheckoutDialogCommand}" />
+        <KeyBinding Gesture="Meta+Shift+Enter" Command="{Binding CheckoutCommand}" />
+        <KeyBinding Gesture="Control+Shift+Enter" Command="{Binding CheckoutCommand}" />
+
+        <KeyBinding Gesture="Meta+X" Command="{Binding HoldCartCommand}" />
+        <KeyBinding Gesture="Control+X" Command="{Binding HoldCartCommand}" />
+
+        <KeyBinding Gesture="Meta+Z" Command="{Binding ResetCartCommand}" />
+        <KeyBinding Gesture="Control+Z" Command="{Binding ResetCartCommand}" />
+    </Window.KeyBindings>
 
     <Grid>
         <Grid IsVisible="{Binding IsLoginScreen}"
@@ -142,7 +173,7 @@
                                 FontWeight="SemiBold"
                                 Command="{Binding OpenShiftCommand}" />
                         <Button Grid.Column="1"
-                                Content="Выйти"
+                                Content="Выйти (ctrl+shift+q)"
                                 Height="44"
                                 Background="#F43F5E"
                                 Foreground="White"
@@ -181,7 +212,7 @@
             </StackPanel>
 
             <Grid Grid.Row="1"
-                  ColumnDefinitions="290,*,430"
+                  ColumnDefinitions="360,*,500"
                   ColumnSpacing="14">
                 <Border Grid.Column="0"
                         CornerRadius="20"
@@ -206,26 +237,59 @@
                         </StackPanel>
 
                         <StackPanel Grid.Row="1" Margin="0,14,0,14" Spacing="8">
-                            <Button Content="Закрыть смену"
-                                    Background="#10B981"
+                            <Button Background="#10B981"
                                     Foreground="White"
-                                    Height="42"
-                                    Command="{Binding ToggleCloseShiftDialogCommand}" />
-                            <Button Content="Новая корзина"
-                                    Background="#06B6D4"
+                                    Height="44"
+                                    HorizontalAlignment="Stretch"
+                                    HorizontalContentAlignment="Stretch"
+                                    Command="{Binding ToggleCloseShiftDialogCommand}">
+                                <Grid ColumnDefinitions="Auto,*">
+                                    <svg:Svg Path="/Assets/icons/solar/power-linear.svg"
+                                             Width="18"
+                                             Height="18"
+                                             VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1"
+                                               Margin="10,0,0,0"
+                                               Text="Закрыть смену (ctrl+shift+s)"
+                                               VerticalAlignment="Center" />
+                                </Grid>
+                            </Button>
+
+                            <Button Background="#94A3B8"
                                     Foreground="White"
-                                    Height="42"
-                                    Command="{Binding NewCartCommand}" />
-                            <Button Content="Обновить"
-                                    Background="#94A3B8"
+                                    Height="44"
+                                    HorizontalAlignment="Stretch"
+                                    HorizontalContentAlignment="Stretch"
+                                    Command="{Binding RefreshAllCommand}">
+                                <Grid ColumnDefinitions="Auto,*">
+                                    <svg:Svg Path="/Assets/icons/solar/refresh-linear.svg"
+                                             Width="18"
+                                             Height="18"
+                                             VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1"
+                                               Margin="10,0,0,0"
+                                               Text="Обновить (ctrl+r)"
+                                               VerticalAlignment="Center" />
+                                </Grid>
+                            </Button>
+
+                            <Button Background="#F43F5E"
                                     Foreground="White"
-                                    Height="42"
-                                    Command="{Binding RefreshAllCommand}" />
-                            <Button Content="Выйти из аккаунта"
-                                    Background="#F43F5E"
-                                    Foreground="White"
-                                    Height="42"
-                                    Command="{Binding LogoutCommand}" />
+                                    Height="44"
+                                    HorizontalAlignment="Stretch"
+                                    HorizontalContentAlignment="Stretch"
+                                    Command="{Binding LogoutCommand}">
+                                <Grid ColumnDefinitions="Auto,*">
+                                    <svg:Svg Path="/Assets/icons/solar/logout-2-linear.svg"
+                                             Width="18"
+                                             Height="18"
+                                             VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1"
+                                               Margin="10,0,0,0"
+                                               Text="Выйти из аккаунта (ctrl+shift+q)"
+                                               VerticalAlignment="Center" />
+                                </Grid>
+                            </Button>
                         </StackPanel>
 
                         <Border Grid.Row="2"
@@ -247,12 +311,17 @@
                                         <TextBlock Text="{Binding CartCount}" Foreground="#475569" />
                                     </Border>
                                 </StackPanel>
-                                <ScrollViewer Grid.Row="1" Margin="0,8,0,0">
-                                    <ItemsControl ItemsSource="{Binding Carts}">
+                                <ScrollViewer Grid.Row="1"
+                                              Margin="0,8,0,0"
+                                              HorizontalScrollBarVisibility="Disabled">
+                                    <ItemsControl ItemsSource="{Binding Carts}"
+                                                  HorizontalAlignment="Stretch"
+                                                  VerticalAlignment="Top">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
                                                 <Button Margin="0,0,0,8"
                                                         Height="40"
+                                                        HorizontalAlignment="Stretch"
                                                         HorizontalContentAlignment="Left"
                                                         Content="{Binding Id, StringFormat=Корзина #{0}}"
                                                         Command="{Binding DataContext.SelectCartCommand, RelativeSource={RelativeSource AncestorType=Window}}"
@@ -272,15 +341,17 @@
                         BorderBrush="#D8E0EA"
                         BorderThickness="1"
                         Padding="14">
-                    <Grid RowDefinitions="Auto,Auto,Auto,*">
+                    <Grid RowDefinitions="Auto,Auto,*">
                         <TextBlock Text="Сканирование"
                                    Foreground="#64748B"
                                    FontSize="12" />
-                        <Grid Grid.Row="1" ColumnDefinitions="*,Auto" ColumnSpacing="8" Margin="0,6,0,0">
+                        <Grid Grid.Row="1" ColumnDefinitions="*,Auto" ColumnSpacing="8" Margin="0,6,0,10">
                             <TextBox Grid.Column="0"
+                                     x:Name="BarcodeInputTextBox"
                                      Text="{Binding BarcodeInput}"
                                      Watermark="Сканируй штрих-код"
-                                     Height="42" />
+                                     Height="42"
+                                     KeyDown="BarcodeInputTextBox_OnKeyDown" />
                             <Button Grid.Column="1"
                                     Content="Добавить"
                                     Height="42"
@@ -289,27 +360,7 @@
                                     Command="{Binding AddByBarcodeCommand}" />
                         </Grid>
 
-                        <Grid Grid.Row="2" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" Margin="0,10,0,10">
-                            <TextBox Grid.Column="0"
-                                     Text="{Binding SearchText}"
-                                     Watermark="Поиск товара"
-                                     Height="38" />
-                            <Button Grid.Column="1"
-                                    Content="Поиск"
-                                    Height="38"
-                                    Background="#0EA5E9"
-                                    Foreground="White"
-                                    Command="{Binding RefreshProductsCommand}" />
-                            <Border Grid.Column="2"
-                                    CornerRadius="10"
-                                    Padding="10,6"
-                                    Background="#E0F2FE">
-                                <TextBlock Text="{Binding ProductCount, StringFormat={}{0} позиций}"
-                                           Foreground="#0C4A6E" />
-                            </Border>
-                        </Grid>
-
-                        <ScrollViewer Grid.Row="3">
+                        <ScrollViewer Grid.Row="2">
                             <ItemsControl ItemsSource="{Binding Products}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
@@ -388,30 +439,46 @@
                                                 Margin="0,0,0,8"
                                                 Background="#F8FAFC"
                                                 Padding="8">
-                                            <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
+                                            <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" ColumnSpacing="8">
                                                 <TextBlock Text="{Binding ProductName}"
                                                            VerticalAlignment="Center"
                                                            FontWeight="SemiBold"
                                                            Foreground="#0F172A"
                                                            TextTrimming="CharacterEllipsis" />
-                                                <Grid Grid.Column="1" ColumnDefinitions="Auto,Auto,Auto" VerticalAlignment="Center">
+                                                <Grid Grid.Column="1" ColumnDefinitions="Auto,Auto,Auto" ColumnSpacing="6" VerticalAlignment="Center">
                                                     <Button Grid.Column="0"
                                                             Width="30"
                                                             Height="30"
-                                                            Content="-"
+                                                            Background="#E2E8F0"
+                                                            BorderBrush="#CBD5E1"
+                                                            BorderThickness="1"
                                                             Command="{Binding DataContext.DecrementItemCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                            CommandParameter="{Binding .}" />
+                                                            CommandParameter="{Binding .}">
+                                                        <svg:Svg Path="/Assets/icons/solar/minus-circle-linear.svg"
+                                                                 Width="16"
+                                                                 Height="16"
+                                                                 VerticalAlignment="Center"
+                                                                 HorizontalAlignment="Center" />
+                                                    </Button>
                                                     <TextBlock Grid.Column="1"
-                                                               Margin="8,0"
                                                                VerticalAlignment="Center"
+                                                               HorizontalAlignment="Center"
                                                                Text="{Binding Quantity}"
                                                                FontWeight="SemiBold" />
                                                     <Button Grid.Column="2"
                                                             Width="30"
                                                             Height="30"
-                                                            Content="+"
+                                                            Background="#E2E8F0"
+                                                            BorderBrush="#CBD5E1"
+                                                            BorderThickness="1"
                                                             Command="{Binding DataContext.IncrementItemCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                            CommandParameter="{Binding .}" />
+                                                            CommandParameter="{Binding .}">
+                                                        <svg:Svg Path="/Assets/icons/solar/add-circle-linear.svg"
+                                                                 Width="16"
+                                                                 Height="16"
+                                                                 VerticalAlignment="Center"
+                                                                 HorizontalAlignment="Center" />
+                                                    </Button>
                                                 </Grid>
                                                 <TextBlock Grid.Column="2"
                                                            VerticalAlignment="Center"
@@ -421,11 +488,32 @@
                                                 <Button Grid.Column="3"
                                                         Width="32"
                                                         Height="32"
-                                                        Content="✕"
+                                                        Background="#DBEAFE"
+                                                        BorderBrush="#BFDBFE"
+                                                        BorderThickness="1"
+                                                        Command="{Binding DataContext.OpenItemDiscountDialogCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                        CommandParameter="{Binding .}">
+                                                    <svg:Svg Path="/Assets/icons/solar/tag-price-linear.svg"
+                                                             Width="16"
+                                                             Height="16"
+                                                             VerticalAlignment="Center"
+                                                             HorizontalAlignment="Center" />
+                                                </Button>
+                                                <Button Grid.Column="4"
+                                                        Width="32"
+                                                        Height="32"
                                                         Background="#FFE4E6"
+                                                        BorderBrush="#FECDD3"
+                                                        BorderThickness="1"
                                                         Foreground="#BE123C"
                                                         Command="{Binding DataContext.RemoveItemCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                        CommandParameter="{Binding .}" />
+                                                        CommandParameter="{Binding .}">
+                                                    <svg:Svg Path="/Assets/icons/solar/trash-bin-2-linear.svg"
+                                                             Width="16"
+                                                             Height="16"
+                                                             VerticalAlignment="Center"
+                                                             HorizontalAlignment="Center" />
+                                                </Button>
                                             </Grid>
                                         </Border>
                                     </DataTemplate>
@@ -462,29 +550,82 @@
                                                Foreground="#B45309" />
                                 </Grid>
 
-                                <Grid ColumnDefinitions="*,*" ColumnSpacing="8" Margin="0,8,0,0">
+                                <Grid ColumnDefinitions="*,*"
+                                      ColumnSpacing="8"
+                                      Margin="0,8,0,0"
+                                      HorizontalAlignment="Stretch">
                                     <Button Grid.Column="0"
-                                            Content="Скидка"
                                             Background="#F43F5E"
                                             Foreground="White"
-                                            Command="{Binding ToggleDiscountDialogCommand}" />
+                                            HorizontalAlignment="Stretch"
+                                            HorizontalContentAlignment="Stretch"
+                                            Command="{Binding ToggleDiscountDialogCommand}">
+                                        <Grid ColumnDefinitions="Auto,*">
+                                            <svg:Svg Path="/Assets/icons/solar/sale-linear.svg"
+                                                     Width="18"
+                                                     Height="18"
+                                                     VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="1"
+                                                       Margin="8,0,0,0"
+                                                       Text="Скидка (ctrl+m)"
+                                                       VerticalAlignment="Center" />
+                                        </Grid>
+                                    </Button>
                                     <Button Grid.Column="1"
-                                            Content="Оформить"
                                             Background="#06B6D4"
                                             Foreground="White"
-                                            Command="{Binding ToggleCheckoutDialogCommand}" />
+                                            HorizontalAlignment="Stretch"
+                                            HorizontalContentAlignment="Stretch"
+                                            Command="{Binding ToggleCheckoutDialogCommand}">
+                                        <Grid ColumnDefinitions="Auto,*">
+                                            <svg:Svg Path="/Assets/icons/solar/check-square-linear.svg"
+                                                     Width="18"
+                                                     Height="18"
+                                                     VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="1"
+                                                       Margin="8,0,0,0"
+                                                       Text="Оформить (ctrl+enter)"
+                                                       VerticalAlignment="Center" />
+                                        </Grid>
+                                    </Button>
                                 </Grid>
-                                <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                <Grid ColumnDefinitions="*,*"
+                                      ColumnSpacing="8"
+                                      HorizontalAlignment="Stretch">
                                     <Button Grid.Column="0"
-                                            Content="Держать"
                                             Background="#CBD5E1"
                                             Foreground="#0F172A"
-                                            Command="{Binding NewCartCommand}" />
+                                            HorizontalAlignment="Stretch"
+                                            HorizontalContentAlignment="Stretch"
+                                            Command="{Binding HoldCartCommand}">
+                                        <Grid ColumnDefinitions="Auto,*">
+                                            <svg:Svg Path="/Assets/icons/solar/copy-linear.svg"
+                                                     Width="18"
+                                                     Height="18"
+                                                     VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="1"
+                                                       Margin="8,0,0,0"
+                                                       Text="Держать (ctrl+x)"
+                                                       VerticalAlignment="Center" />
+                                        </Grid>
+                                    </Button>
                                     <Button Grid.Column="1"
-                                            Content="Сбросить"
                                             Background="#F43F5E"
                                             Foreground="White"
-                                            Command="{Binding ResetCartCommand}" />
+                                            HorizontalAlignment="Stretch"
+                                            HorizontalContentAlignment="Stretch"
+                                            Command="{Binding ResetCartCommand}">
+                                        <Grid ColumnDefinitions="Auto,*">
+                                            <svg:Svg Path="/Assets/icons/solar/restart-linear.svg"
+                                                     Width="18"
+                                                     Height="18"
+                                                     VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="1"
+                                                       Margin="8,0,0,0"
+                                                       Text="Сбросить (ctrl+z)"
+                                                       VerticalAlignment="Center" />
+                                        </Grid>
+                                    </Button>
                                 </Grid>
                             </StackPanel>
                         </Border>
@@ -495,28 +636,83 @@
 
         <Border IsVisible="{Binding IsDiscountDialogOpen}"
                 Background="#880F172A">
-            <Grid HorizontalAlignment="Center" VerticalAlignment="Center" Width="400">
+            <Grid HorizontalAlignment="Center" VerticalAlignment="Center" Width="440">
                 <Border Background="White"
                         BorderBrush="#D8E0EA"
                         BorderThickness="1"
                         CornerRadius="18"
-                        Padding="16">
-                    <StackPanel Spacing="10">
+                        Padding="18">
+                    <StackPanel Spacing="12"
+                                HorizontalAlignment="Stretch">
                         <TextBlock Text="Скидка на корзину" FontSize="22" FontWeight="SemiBold" />
-                        <ComboBox ItemsSource="{Binding DiscountTypes}" SelectedItem="{Binding DiscountType}" />
+                        <TextBlock Text="Выберите тип: fixed или percent"
+                                   Foreground="#64748B"
+                                   FontSize="12" />
+                        <ComboBox ItemsSource="{Binding DiscountTypes}"
+                                  SelectedItem="{Binding DiscountType}"
+                                  HorizontalAlignment="Stretch" />
                         <TextBox Text="{Binding DiscountValueInput}"
-                                 Watermark="Введите сумму или процент" />
-                        <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                 Watermark="Введите сумму или процент"
+                                 HorizontalAlignment="Stretch" />
+                        <Grid ColumnDefinitions="*,*"
+                              ColumnSpacing="10"
+                              HorizontalAlignment="Stretch">
                             <Button Grid.Column="0"
-                                    Content="Применить"
+                                    Content="Применить (ctrl+shift+m)"
                                     Background="#10B981"
                                     Foreground="White"
+                                    HorizontalAlignment="Stretch"
                                     Command="{Binding ApplyDiscountCommand}" />
                             <Button Grid.Column="1"
-                                    Content="Закрыть"
+                                    Content="Закрыть (esc)"
                                     Background="#E2E8F0"
                                     Foreground="#0F172A"
+                                    HorizontalAlignment="Stretch"
                                     Command="{Binding ToggleDiscountDialogCommand}" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
+
+        <Border IsVisible="{Binding IsItemDiscountDialogOpen}"
+                Background="#880F172A">
+            <Grid HorizontalAlignment="Center" VerticalAlignment="Center" Width="440">
+                <Border Background="White"
+                        BorderBrush="#D8E0EA"
+                        BorderThickness="1"
+                        CornerRadius="18"
+                        Padding="18">
+                    <StackPanel Spacing="12"
+                                HorizontalAlignment="Stretch">
+                        <TextBlock Text="Скидка на товар" FontSize="22" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding SelectedDiscountItem.ProductName}"
+                                   Foreground="#334155"
+                                   TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="Выберите тип: fixed или percent"
+                                   Foreground="#64748B"
+                                   FontSize="12" />
+                        <ComboBox ItemsSource="{Binding ItemDiscountTypes}"
+                                  SelectedItem="{Binding ItemDiscountType}"
+                                  HorizontalAlignment="Stretch" />
+                        <TextBox Text="{Binding ItemDiscountValueInput}"
+                                 Watermark="Введите сумму или процент"
+                                 HorizontalAlignment="Stretch" />
+                        <Grid ColumnDefinitions="*,*"
+                              ColumnSpacing="10"
+                              HorizontalAlignment="Stretch">
+                            <Button Grid.Column="0"
+                                    Content="Применить (ctrl+shift+d)"
+                                    Background="#10B981"
+                                    Foreground="White"
+                                    HorizontalAlignment="Stretch"
+                                    Command="{Binding ApplyItemDiscountCommand}" />
+                            <Button Grid.Column="1"
+                                    Content="Закрыть (esc)"
+                                    Background="#E2E8F0"
+                                    Foreground="#0F172A"
+                                    HorizontalAlignment="Stretch"
+                                    Command="{Binding ToggleItemDiscountDialogCommand}" />
                         </Grid>
                     </StackPanel>
                 </Border>
@@ -531,9 +727,12 @@
                         BorderThickness="1"
                         CornerRadius="18"
                         Padding="16">
-                    <StackPanel Spacing="10">
+                    <StackPanel Spacing="10"
+                                HorizontalAlignment="Stretch">
                         <TextBlock Text="Оформить заказ" FontSize="22" FontWeight="SemiBold" />
-                        <ComboBox ItemsSource="{Binding PaymentMethods}" SelectedItem="{Binding PaymentMethod}" />
+                        <ComboBox ItemsSource="{Binding PaymentMethods}"
+                                  SelectedItem="{Binding PaymentMethod}"
+                                  HorizontalAlignment="Stretch" />
 
                         <TextBox IsVisible="{Binding IsDebtPayment}"
                                  Text="{Binding CustomerName}"
@@ -577,16 +776,20 @@
                             </StackPanel>
                         </Border>
 
-                        <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                        <Grid ColumnDefinitions="*,*"
+                              ColumnSpacing="8"
+                              HorizontalAlignment="Stretch">
                             <Button Grid.Column="0"
-                                    Content="Оформить"
+                                    Content="Оформить (ctrl+shift+enter)"
                                     Background="#10B981"
                                     Foreground="White"
+                                    HorizontalAlignment="Stretch"
                                     Command="{Binding CheckoutCommand}" />
                             <Button Grid.Column="1"
-                                    Content="Закрыть"
+                                    Content="Закрыть (esc)"
                                     Background="#E2E8F0"
                                     Foreground="#0F172A"
+                                    HorizontalAlignment="Stretch"
                                     Command="{Binding ToggleCheckoutDialogCommand}" />
                         </Grid>
                     </StackPanel>

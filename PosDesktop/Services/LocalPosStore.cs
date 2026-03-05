@@ -161,7 +161,7 @@ public sealed class LocalPosStore
         await transaction.CommitAsync();
     }
 
-    public async Task<List<ProductDto>> LoadProductsAsync(string? search = null)
+    public async Task<List<ProductDto>> LoadProductsAsync(string? search = null, bool activeOnly = false)
     {
         var products = new List<ProductDto>();
 
@@ -182,6 +182,13 @@ public sealed class LocalPosStore
             }
 
             products.Add(product);
+        }
+
+        if (activeOnly)
+        {
+            products = products
+                .Where(p => string.Equals(p.Status, "active", StringComparison.OrdinalIgnoreCase))
+                .ToList();
         }
 
         if (string.IsNullOrWhiteSpace(search))
